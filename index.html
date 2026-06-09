@@ -193,6 +193,10 @@ details.section > summary .tag{
   font-family:var(--font-mono); font-size:11px; color:var(--text);
   min-width:48px; text-align:right;
 }
+.ctrl .swatch{
+  width:12px; height:12px; border-radius:3px; margin-left:auto; margin-right:8px;
+  border:1px solid rgba(0,0,0,.4); box-shadow:0 0 0 1px var(--line);
+}
 input[type=range]{
   -webkit-appearance:none; appearance:none;
   width:100%; height:4px; border-radius:3px;
@@ -296,9 +300,10 @@ footer .dot{ color:var(--ok); }
   <!-- Controls (sections are generated into here by JS) -->
   <aside class="controls" id="controls">
     <div class="note">
-      <b>Phase 1 — Core grading engine.</b><br>
-      Grade runs live in a WebGL2 shader. Drag the divider to compare
-      before / after. Load your own image to start crafting a look.
+      <b>Phase 2 — Split toning &amp; faded black.</b><br>
+      Grade runs live in a WebGL2 shader. Tint shadows &amp; highlights with
+      Split Toning, then add a matte film fade. Drag the divider to compare
+      before / after; load your own image to start crafting a look.
     </div>
     <!-- sections injected here -->
   </aside>
@@ -313,11 +318,13 @@ footer .dot{ color:var(--ok); }
 
 <script>
 /* ============================================================================
-   LUT GEN — PHASE 1
+   LUT GEN — PHASE 2  (split toning + faded black on the Phase 1 engine)
    ----------------------------------------------------------------------------
    Everything is vanilla JS. The grade is computed entirely in a single WebGL2
    fragment shader so the preview is real-time and — importantly — the SAME math
    will later be re-run on an identity LUT grid to BAKE an exact .cube export.
+   Every Phase 2 control is an exact identity at its default, so that future
+   neutral-grade round-trip stays numerically exact.
 
    COLOR-SCIENCE NOTE (Phase 1 default, easy to revisit):
    We grade directly on the image's stored 0..1 RGB values (display / encoded
@@ -351,6 +358,12 @@ function defaultGrade(){
     },
     // Overall colour
     saturation:0, vibrance:0,
+    // Split toning — tint shadows & highlights toward separate hues.
+    // Default hues = classic teal shadows / warm highlights; sat 0 = identity.
+    split:{ shadowHue:215, shadowSat:0, highHue:45, highSat:0, balance:0 },
+    // Faded black — matte film look. fade lifts the black floor, rolloff
+    // lowers the white ceiling; both 0 = identity.
+    fade:0, fadeRolloff:0,
   };
 }
 let grade = defaultGrade();
@@ -447,6 +460,12 @@ uniform float uHslSat[7];
 uniform float uHslLum[7];
 /* Overall */
 uniform float uSaturation, uVibrance;
+/* Split toning */
+uniform float uSplitShadowHue, uSplitShadowSat;
+uniform float uSplitHighHue,   uSplitHighSat;
+uniform float uSplitBalance;
+/* Faded black (matte) */
+uniform float uFade, uFadeRolloff;
 
 const float PI = 3.14159265;
 float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -542,6 +561,32 @@ vec3 applyGrade(vec3 c){
   float sat = mx - mn;
   c = mix(vec3(luma(c)), c, 1.0 + uVibrance*(1.0 - sat)); // protect saturated
 
+  /* 8. Split toning ------------------------------------------------- */
+  // Tint shadows toward one hue and highlights toward another. The colour
+  // push is luma-neutral (we subtract the hue's own luma) so it only shifts
+  // colour, never brightness. sat 0 on both = exact identity.
+  {
+    float Ls  = luma(clamp(c, 0.0, 1.0));
+    float bal = uSplitBalance * 0.5;                 // -0.5..0.5 crossover shift
+    float wH  = smoothstep(0.0, 1.0, clamp(Ls + bal, 0.0, 1.0)); // highlight weight
+    float wS  = 1.0 - wH;                            // shadow weight
+    vec3 sT = hsl2rgb(vec3(uSplitShadowHue/360.0, 1.0, 0.5));
+    vec3 hT = hsl2rgb(vec3(uSplitHighHue /360.0, 1.0, 0.5));
+    sT -= luma(sT);  hT -= luma(hT);                 // make the push luma-neutral
+    c += sT * uSplitShadowSat * wS * 0.5;
+    c += hT * uSplitHighSat   * wH * 0.5;
+  }
+
+  /* 9. Faded black (matte) ------------------------------------------ */
+  // Single linear remap of [0,1] -> [floor, ceil]. fade lifts the black
+  // floor (milky shadows); rolloff drops the white ceiling (low-contrast
+  // film fade). Both 0 -> floor 0, ceil 1 -> exact identity.
+  {
+    float floorV = uFade        * 0.18;              // max ~0.18 lifted blacks
+    float ceilV  = 1.0 - uFadeRolloff * 0.15;        // max ~0.15 lowered whites
+    c = floorV + c * (ceilV - floorV);
+  }
+
   return c;
 }
 
@@ -581,7 +626,9 @@ function buildProgram(){
   const names = ['uImage','uSplit','uShowSplit','uTemp','uTint','uExposure',
     'uContrast','uHighlights','uShadows','uWhites','uBlacks',
     'uLift','uGamma','uGain','uSaturation','uVibrance',
-    'uHslHue[0]','uHslSat[0]','uHslLum[0]'];
+    'uHslHue[0]','uHslSat[0]','uHslLum[0]',
+    'uSplitShadowHue','uSplitShadowSat','uSplitHighHue','uSplitHighSat',
+    'uSplitBalance','uFade','uFadeRolloff'];
   names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
 }
 
@@ -649,6 +696,14 @@ function render(){
   gl.uniform1f(uniforms['uSaturation'], grade.saturation);
   gl.uniform1f(uniforms['uVibrance'], grade.vibrance);
 
+  gl.uniform1f(uniforms['uSplitShadowHue'], grade.split.shadowHue);
+  gl.uniform1f(uniforms['uSplitShadowSat'], grade.split.shadowSat);
+  gl.uniform1f(uniforms['uSplitHighHue'],   grade.split.highHue);
+  gl.uniform1f(uniforms['uSplitHighSat'],   grade.split.highSat);
+  gl.uniform1f(uniforms['uSplitBalance'],   grade.split.balance);
+  gl.uniform1f(uniforms['uFade'],           grade.fade);
+  gl.uniform1f(uniforms['uFadeRolloff'],    grade.fadeRolloff);
+
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
@@ -703,7 +758,7 @@ function addSection(title, open=false){
 
 // A labelled slider bound to a getter/setter so it works for nested state too.
 function addSlider(parent, opts){
-  const {label, min, max, step, get, set, fmt} = opts;
+  const {label, min, max, step, get, set, fmt, swatch} = opts;
   const wrap = document.createElement('div'); wrap.className = 'ctrl';
   const fmtFn = fmt || (v => (v>0?'+':'') + v.toFixed(2));
   wrap.innerHTML =
@@ -713,7 +768,16 @@ function addSlider(parent, opts){
   input.value = get();
   wrap.appendChild(input);
   const val = wrap.querySelector('.val');
-  const refresh = ()=>{ val.textContent = fmtFn(get()); };
+  // optional live colour chip (used by the split-toning hue rows)
+  let chip = null;
+  if(swatch){
+    chip = document.createElement('span'); chip.className = 'swatch';
+    wrap.querySelector('.row').insertBefore(chip, val);
+  }
+  const refresh = ()=>{
+    val.textContent = fmtFn(get());
+    if(chip) chip.style.background = swatch(get());
+  };
   refresh();
   input.addEventListener('input', ()=>{
     set(parseFloat(input.value)); refresh(); render();
@@ -841,6 +905,32 @@ function buildUI(){
     get:()=>grade.saturation,set:v=>grade.saturation=v}));
   sliderRefs.push(addSlider(b,{label:'Vibrance',min:-1,max:1,step:0.01,
     get:()=>grade.vibrance,set:v=>grade.vibrance=v}));
+
+  /* --- Split Toning --- */
+  b = addSection('Split Toning');
+  const hueFmt   = v => Math.round(v) + '°';
+  const satFmt   = v => v.toFixed(2);
+  const hueColor = v => `hsl(${v} 70% 50%)`;
+  sliderRefs.push(addSlider(b,{label:'Shadow Hue',min:0,max:360,step:1,
+    get:()=>grade.split.shadowHue,set:v=>grade.split.shadowHue=v,
+    fmt:hueFmt, swatch:hueColor}));
+  sliderRefs.push(addSlider(b,{label:'Shadow Strength',min:0,max:1,step:0.01,
+    get:()=>grade.split.shadowSat,set:v=>grade.split.shadowSat=v, fmt:satFmt}));
+  sliderRefs.push(addSlider(b,{label:'Highlight Hue',min:0,max:360,step:1,
+    get:()=>grade.split.highHue,set:v=>grade.split.highHue=v,
+    fmt:hueFmt, swatch:hueColor}));
+  sliderRefs.push(addSlider(b,{label:'Highlight Strength',min:0,max:1,step:0.01,
+    get:()=>grade.split.highSat,set:v=>grade.split.highSat=v, fmt:satFmt}));
+  sliderRefs.push(addSlider(b,{label:'Balance',min:-1,max:1,step:0.01,
+    get:()=>grade.split.balance,set:v=>grade.split.balance=v}));
+
+  /* --- Faded Black (matte) --- */
+  b = addSection('Faded Black');
+  sliderRefs.push(addSlider(b,{label:'Fade',min:0,max:1,step:0.01,
+    get:()=>grade.fade,set:v=>grade.fade=v, fmt:v=>Math.round(v*100)+'%'}));
+  sliderRefs.push(addSlider(b,{label:'Highlight Rolloff',min:0,max:1,step:0.01,
+    get:()=>grade.fadeRolloff,set:v=>grade.fadeRolloff=v,
+    fmt:v=>Math.round(v*100)+'%'}));
 }
 function refreshHsl(){
   hslSliders.hue._refresh();
@@ -918,7 +1008,7 @@ function init(){
   buildUI();
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 1';
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 2';
 }
 init();
 </script>

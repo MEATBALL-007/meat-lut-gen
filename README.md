@@ -18,6 +18,18 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
   - Saturation & Vibrance
 - Before/after split slider with image upload (+ drag & drop).
 
+**Phase 2 — Split toning & faded black ✅**
+
+- **Split Toning** — independent Shadow / Highlight hue + strength, plus a
+  Balance control to slide the shadow↔highlight crossover. The colour push is
+  luma-neutral (the hue's own luma is removed) so it only shifts colour, never
+  brightness. Live hue swatches on each hue slider.
+- **Faded Black** — a matte film look: Fade lifts the black floor (milky
+  shadows) and Highlight Rolloff lowers the white ceiling, implemented as a
+  single linear `[0,1] → [floor, ceil]` remap.
+- Both new sections are an **exact identity at their defaults**, so the planned
+  neutral-grade LUT round-trip (Phase 8) stays numerically exact.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -35,6 +47,6 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 
 ## Roadmap
 
-Split toning · faded black · curve editor · reference look-match · film-stock
-presets · auto variations · multi-image + motion preview · scopes · log/color
-space · multi-format LUT export · auto cover image · pack workflow.
+~~Split toning~~ · ~~faded black~~ · curve editor · reference look-match ·
+film-stock presets · auto variations · multi-image + motion preview · scopes ·
+log/color space · multi-format LUT export · auto cover image · pack workflow.
