@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LUT GEN — MEAT LUT Studio</title>
+
+<!-- Fonts: Space Grotesk (UI) + JetBrains Mono (numbers/technical). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================================
+   MEAT LUT — KMUTT THEME TOKENS
+   All colors / fonts live here so the whole app stays on-brand.
+   ========================================================================== */
+:root{
+  --bg:        #1A1A1A;   /* app background        */
+  --surface:   #242424;   /* panels / cards        */
+  --surface-2: #2E2E2E;   /* raised elements       */
+  --line:      #383838;   /* borders / dividers    */
+  --accent:    #FA4616;   /* MEAT orange           */
+  --accent-2:  #FFC72C;   /* KMUTT yellow          */
+  --text:      #F5F3EF;   /* primary text          */
+  --text-dim:  #9A968F;   /* secondary text        */
+  --ok:        #4ED39B;   /* success / neutral grade */
+  --font-ui:   'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; margin:0; }
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-ui);
+  font-size:14px;
+  -webkit-font-smoothing:antialiased;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+/* ----------------------------------------------------------------------------
+   TOP BAR
+   -------------------------------------------------------------------------- */
+header{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding:12px 20px;
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+  flex:0 0 auto;
+}
+.brand{ display:flex; align-items:baseline; gap:10px; }
+.brand .mark{
+  font-weight:700; font-size:20px; letter-spacing:1px;
+  color:var(--text);
+}
+.brand .mark .lut{ color:var(--accent); }
+.brand .sub{
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+  text-transform:uppercase; letter-spacing:2px;
+}
+.brand .meat{
+  font-family:var(--font-mono); font-size:11px; color:var(--accent-2);
+  border:1px solid var(--line); padding:3px 8px; border-radius:4px;
+}
+.spacer{ flex:1; }
+
+button.btn{
+  font-family:var(--font-ui); font-weight:600; font-size:13px;
+  color:var(--text); background:var(--surface-2);
+  border:1px solid var(--line); border-radius:6px;
+  padding:8px 14px; cursor:pointer; transition:.12s;
+}
+button.btn:hover{ border-color:var(--accent); color:#fff; }
+button.btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+button.btn.primary:hover{ filter:brightness(1.08); }
+button.btn.ghost{ background:transparent; }
+
+/* ----------------------------------------------------------------------------
+   MAIN LAYOUT: preview (flex) + controls (fixed sidebar)
+   -------------------------------------------------------------------------- */
+main{
+  flex:1 1 auto;
+  display:grid;
+  grid-template-columns: 1fr 360px;
+  min-height:0;
+}
+
+/* --- Preview side --- */
+.preview-pane{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  min-width:0;
+  background:
+     radial-gradient(circle at 50% 40%, #202020 0%, var(--bg) 70%);
+}
+.preview-wrap{
+  position:relative;
+  display:inline-block;
+  line-height:0;
+  box-shadow:0 12px 40px rgba(0,0,0,.5);
+  border-radius:6px;
+  overflow:hidden;
+  max-width:100%;
+  max-height:100%;
+}
+#glcanvas{
+  display:block;
+  max-width:100%;
+  max-height:calc(100vh - 160px);
+}
+
+/* Split slider handle (overlays the canvas, drag to move the divider). */
+#splitHandle{
+  position:absolute; top:0; bottom:0; left:50%;
+  transform:translateX(-50%);
+  width:30px; cursor:ew-resize;
+  display:flex; align-items:center; justify-content:center;
+  z-index:5;
+}
+#splitHandle .line{
+  position:absolute; top:0; bottom:0; left:50%;
+  width:2px; margin-left:-1px;
+  background:var(--text);
+  box-shadow:0 0 0 1px rgba(0,0,0,.4);
+}
+#splitHandle .grip{
+  position:relative;
+  width:30px; height:30px; border-radius:50%;
+  background:var(--text); color:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700;
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
+}
+.split-label{
+  position:absolute; top:10px;
+  font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+  color:var(--text); background:rgba(0,0,0,.45);
+  padding:3px 7px; border-radius:4px; z-index:4; pointer-events:none;
+}
+#beforeLabel{ left:10px; }
+#afterLabel{ right:10px; color:var(--accent-2); }
+
+.preview-toolbar{
+  position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+  display:flex; gap:8px; align-items:center; z-index:6;
+  background:rgba(20,20,20,.7); backdrop-filter:blur(6px);
+  border:1px solid var(--line); border-radius:8px; padding:6px 8px;
+}
+
+/* --- Controls side --- */
+.controls{
+  background:var(--surface);
+  border-left:1px solid var(--line);
+  overflow-y:auto;
+  padding:0 0 40px;
+}
+.controls::-webkit-scrollbar{ width:10px; }
+.controls::-webkit-scrollbar-thumb{ background:var(--surface-2); border-radius:6px; }
+
+/* Collapsible section */
+details.section{ border-bottom:1px solid var(--line); }
+details.section > summary{
+  list-style:none; cursor:pointer; user-select:none;
+  padding:12px 16px;
+  display:flex; align-items:center; gap:8px;
+  font-weight:600; font-size:13px; letter-spacing:.4px;
+}
+details.section > summary::-webkit-details-marker{ display:none; }
+details.section > summary .chev{
+  color:var(--text-dim); transition:.15s; font-size:11px;
+}
+details[open] > summary .chev{ transform:rotate(90deg); color:var(--accent); }
+details.section > summary .tag{
+  margin-left:auto; font-family:var(--font-mono); font-size:10px;
+  color:var(--text-dim);
+}
+.section-body{ padding:4px 16px 16px; }
+
+/* Slider rows */
+.ctrl{ margin:10px 0; }
+.ctrl .row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
+.ctrl label{ font-size:12px; color:var(--text-dim); }
+.ctrl .val{
+  font-family:var(--font-mono); font-size:11px; color:var(--text);
+  min-width:48px; text-align:right;
+}
+input[type=range]{
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:4px; border-radius:3px;
+  background:var(--surface-2); outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none;
+  width:14px; height:14px; border-radius:50%;
+  background:var(--accent); border:2px solid #1a1a1a; cursor:pointer;
+}
+input[type=range]::-moz-range-thumb{
+  width:14px; height:14px; border-radius:50%;
+  background:var(--accent); border:2px solid #1a1a1a; cursor:pointer;
+}
+
+/* 3-way color wheels */
+.wheels{ display:flex; gap:10px; justify-content:space-between; }
+.wheel-unit{ flex:1; text-align:center; }
+.wheel-unit .name{
+  font-size:11px; color:var(--text-dim); margin-bottom:6px;
+  text-transform:uppercase; letter-spacing:1px;
+}
+.wheel{
+  position:relative; width:88px; height:88px; margin:0 auto;
+  border-radius:50%;
+  /* Hue ring via conic-gradient, white center via radial = saturation. */
+  background:
+    radial-gradient(circle, #ffffff 0%, rgba(255,255,255,0) 62%),
+    conic-gradient(from 90deg,
+      #ff0000,#ff8000,#ffff00,#80ff00,#00ff00,#00ff80,
+      #00ffff,#0080ff,#0000ff,#8000ff,#ff00ff,#ff0080,#ff0000);
+  border:1px solid var(--line);
+  touch-action:none;
+}
+.wheel .knob{
+  position:absolute; width:12px; height:12px; border-radius:50%;
+  background:#fff; border:2px solid #111;
+  transform:translate(-50%,-50%); left:50%; top:50%;
+  box-shadow:0 1px 3px rgba(0,0,0,.6); pointer-events:none;
+}
+.wheel-unit .lvl{ margin-top:8px; }
+.wheel-unit .lvl .val{ font-size:10px; }
+
+/* HSL band tabs */
+.band-tabs{ display:flex; gap:4px; margin:6px 0 12px; }
+.band-tabs button{
+  flex:1; height:22px; border-radius:4px; cursor:pointer;
+  border:2px solid transparent; padding:0;
+}
+.band-tabs button.active{ border-color:var(--text); }
+
+.note{
+  font-size:11px; color:var(--text-dim); line-height:1.5;
+  background:var(--surface-2); border:1px solid var(--line);
+  border-radius:6px; padding:10px; margin:12px 16px;
+}
+.note b{ color:var(--accent-2); }
+
+.hint{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  pointer-events:none; color:var(--text-dim); font-size:13px;
+}
+
+footer{
+  flex:0 0 auto; padding:6px 20px; background:var(--surface);
+  border-top:1px solid var(--line);
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+  display:flex; gap:16px; align-items:center;
+}
+footer .dot{ color:var(--ok); }
+</style>
+</head>
+<body>
+
+<!-- =========================== TOP BAR =========================== -->
+<header>
+  <div class="brand">
+    <span class="mark">LUT&nbsp;<span class="lut">GEN</span></span>
+    <span class="sub">creation studio</span>
+    <span class="meat">MEAT&nbsp;LUT</span>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" id="btnSplit">Split: On</button>
+  <button class="btn ghost" id="btnReset">Reset Grade</button>
+  <button class="btn primary" id="btnLoad">Load Image</button>
+  <input type="file" id="fileInput" accept="image/*" hidden />
+</header>
+
+<!-- =========================== MAIN =========================== -->
+<main>
+  <!-- Preview -->
+  <section class="preview-pane" id="previewPane">
+    <div class="preview-wrap" id="previewWrap">
+      <canvas id="glcanvas" width="800" height="500"></canvas>
+      <div class="split-label" id="beforeLabel">BEFORE</div>
+      <div class="split-label" id="afterLabel">AFTER</div>
+      <div id="splitHandle"><div class="line"></div><div class="grip">◂▸</div></div>
+    </div>
+  </section>
+
+  <!-- Controls (sections are generated into here by JS) -->
+  <aside class="controls" id="controls">
+    <div class="note">
+      <b>Phase 1 — Core grading engine.</b><br>
+      Grade runs live in a WebGL2 shader. Drag the divider to compare
+      before / after. Load your own image to start crafting a look.
+    </div>
+    <!-- sections injected here -->
+  </aside>
+</main>
+
+<footer>
+  <span class="dot">●</span>
+  <span id="statusText">WebGL2 ready</span>
+  <span class="spacer" style="flex:1"></span>
+  <span id="resText">—</span>
+</footer>
+
+<script>
+/* ============================================================================
+   LUT GEN — PHASE 1
+   ----------------------------------------------------------------------------
+   Everything is vanilla JS. The grade is computed entirely in a single WebGL2
+   fragment shader so the preview is real-time and — importantly — the SAME math
+   will later be re-run on an identity LUT grid to BAKE an exact .cube export.
+
+   COLOR-SCIENCE NOTE (Phase 1 default, easy to revisit):
+   We grade directly on the image's stored 0..1 RGB values (display / encoded
+   space), NOT in scene-linear light. This is the natural model for a LUT that
+   gets dropped onto Rec.709 video later: the LUT maps encoded RGB -> encoded
+   RGB. Log decode + linear options arrive in Phase 7.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. GRADE STATE  — the single source of truth for the whole look.
+      Every control writes here; render() pushes it to the shader.
+   -------------------------------------------------------------------------- */
+const HSL_BANDS = ['Red','Orange','Yellow','Green','Aqua','Blue','Magenta'];
+
+function defaultGrade(){
+  return {
+    // White balance
+    temp:0, tint:0,
+    // Tone
+    exposure:0, contrast:0,
+    highlights:0, shadows:0, whites:0, blacks:0,
+    // 3-way color (each wheel: x,y position in [-1,1] + a master level)
+    lift:  {x:0,y:0,level:0},
+    gamma: {x:0,y:0,level:0},
+    gain:  {x:0,y:0,level:0},
+    // HSL per band (7 entries each)
+    hsl:{
+      hue: new Array(7).fill(0),
+      sat: new Array(7).fill(0),
+      lum: new Array(7).fill(0),
+    },
+    // Overall colour
+    saturation:0, vibrance:0,
+  };
+}
+let grade = defaultGrade();
+
+/* UI state (not part of the exported look) */
+let splitOn   = true;   // before/after compare active?
+let splitPos  = 0.5;    // 0..1 divider position
+let activeBand = 0;     // which HSL band the sliders currently edit
+
+/* --------------------------------------------------------------------------
+   2. COLOR HELPERS (JS side)
+      The 3-way wheels are converted to RGB offset vectors here, then sent to
+      the shader. Doing it in JS keeps the shader simpler and the math is the
+      same for preview and (later) for baking.
+   -------------------------------------------------------------------------- */
+function hsvToRgb(h,s,v){            // h,s,v in 0..1 -> [r,g,b] 0..1
+  const i=Math.floor(h*6), f=h*6-i;
+  const p=v*(1-s), q=v*(1-f*s), t=v*(1-(1-f)*s);
+  switch(i%6){
+    case 0: return [v,t,p];
+    case 1: return [q,v,p];
+    case 2: return [p,v,t];
+    case 3: return [p,q,v];
+    case 4: return [t,p,v];
+    default:return [v,p,q];
+  }
+}
+// Wheel position (x,y in [-1,1]) -> a *luma-neutral* RGB colour push.
+// Angle = hue, distance from centre = strength.
+function wheelToRGB(x,y){
+  const r = Math.min(1, Math.hypot(x,y));
+  if(r < 1e-5) return [0,0,0];
+  let ang = Math.atan2(y,x) * 180/Math.PI;   // degrees
+  let hue = ((ang % 360) + 360) % 360;
+  const [cr,cg,cb] = hsvToRgb(hue/360, 1, 1);
+  const l = 0.2126*cr + 0.7152*cg + 0.0722*cb; // remove luma -> pure colour
+  return [(cr-l)*r, (cg-l)*r, (cb-l)*r];
+}
+// Build the lift / gamma / gain RGB triplets the shader expects.
+// Defaults are identity: lift=0, gamma=1, gain=1.
+function liftVec(){
+  const c = wheelToRGB(grade.lift.x, grade.lift.y);
+  const lv = grade.lift.level * 0.30;          // master lift (raises blacks)
+  return [c[0]*0.20 + lv, c[1]*0.20 + lv, c[2]*0.20 + lv];
+}
+function gammaVec(){
+  const c = wheelToRGB(grade.gamma.x, grade.gamma.y);
+  const lv = grade.gamma.level * 0.50;
+  return [1 + c[0]*0.40 + lv, 1 + c[1]*0.40 + lv, 1 + c[2]*0.40 + lv];
+}
+function gainVec(){
+  const c = wheelToRGB(grade.gain.x, grade.gain.y);
+  const lv = grade.gain.level * 0.50;
+  return [1 + c[0]*0.40 + lv, 1 + c[1]*0.40 + lv, 1 + c[2]*0.40 + lv];
+}
+
+/* --------------------------------------------------------------------------
+   3. WEBGL2 SETUP
+   -------------------------------------------------------------------------- */
+const canvas = document.getElementById('glcanvas');
+const gl = canvas.getContext('webgl2', {preserveDrawingBuffer:true});
+if(!gl){
+  document.getElementById('statusText').textContent =
+    'WebGL2 not supported in this browser.';
+}
+
+const VERT = `#version 300 es
+in vec2 aPos;
+out vec2 vUv;
+void main(){
+  vUv = aPos * 0.5 + 0.5;             // map clip-space quad to 0..1 UVs
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+
+const FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uImage;
+uniform float uSplit;       // divider position 0..1
+uniform bool  uShowSplit;   // before/after compare on?
+
+/* White balance */
+uniform float uTemp, uTint;
+/* Tone */
+uniform float uExposure, uContrast;
+uniform float uHighlights, uShadows, uWhites, uBlacks;
+/* 3-way colour */
+uniform vec3 uLift, uGamma, uGain;
+/* HSL (per band) */
+uniform float uHslHue[7];
+uniform float uHslSat[7];
+uniform float uHslLum[7];
+/* Overall */
+uniform float uSaturation, uVibrance;
+
+const float PI = 3.14159265;
+float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+/* ---- RGB <-> HSL ---- */
+vec3 rgb2hsl(vec3 c){
+  float mx = max(max(c.r,c.g),c.b);
+  float mn = min(min(c.r,c.g),c.b);
+  float h=0.0, s=0.0, l=(mx+mn)*0.5;
+  float d = mx-mn;
+  if(d > 1e-5){
+    s = l > 0.5 ? d/(2.0-mx-mn) : d/(mx+mn);
+    if(mx == c.r)      h = (c.g-c.b)/d + (c.g < c.b ? 6.0 : 0.0);
+    else if(mx == c.g) h = (c.b-c.r)/d + 2.0;
+    else               h = (c.r-c.g)/d + 4.0;
+    h /= 6.0;
+  }
+  return vec3(h,s,l);
+}
+float hue2rgb(float p, float q, float t){
+  if(t < 0.0) t += 1.0;
+  if(t > 1.0) t -= 1.0;
+  if(t < 1.0/6.0) return p + (q-p)*6.0*t;
+  if(t < 1.0/2.0) return q;
+  if(t < 2.0/3.0) return p + (q-p)*(2.0/3.0 - t)*6.0;
+  return p;
+}
+vec3 hsl2rgb(vec3 hsl){
+  float h=hsl.x, s=hsl.y, l=hsl.z;
+  if(s < 1e-5) return vec3(l);
+  float q = l < 0.5 ? l*(1.0+s) : l + s - l*s;
+  float p = 2.0*l - q;
+  return vec3( hue2rgb(p,q,h + 1.0/3.0),
+               hue2rgb(p,q,h),
+               hue2rgb(p,q,h - 1.0/3.0) );
+}
+
+/* =====================================================================
+   THE GRADE — runs per pixel. This exact chain will later be re-run on
+   an identity LUT grid to bake the .cube export.
+   ===================================================================== */
+vec3 applyGrade(vec3 c){
+
+  /* 1. White balance ------------------------------------------------- */
+  // temp +: warmer (boost R, cut B).  tint +: magenta (cut G).
+  c.r *= (1.0 + uTemp*0.30);
+  c.b *= (1.0 - uTemp*0.30);
+  c.g *= (1.0 - uTint*0.30);
+
+  /* 2. Exposure (brightness in "stops") ------------------------------ */
+  c *= pow(2.0, uExposure);
+
+  /* 3. Contrast around 0.5 pivot ------------------------------------- */
+  c = (c - 0.5) * (1.0 + uContrast) + 0.5;
+
+  /* 4. 3-way colour: gain (highs) -> lift (shadows) -> gamma (mids) -- */
+  c = c * uGain;
+  c = c + uLift * (1.0 - c);
+  c = pow(max(c, 0.0), 1.0 / max(uGamma, vec3(0.001)));
+
+  /* 5. Tonal regions (highlights/shadows/whites/blacks) -------------- */
+  // NOTE: smoothstep needs ascending edges, so the "dark" masks are inverted.
+  float L = luma(clamp(c,0.0,1.0));
+  c += uShadows    * 0.50 * (1.0 - smoothstep(0.0, 0.5, L));
+  c += uHighlights * 0.50 * smoothstep(0.5, 1.0, L);
+  c += uBlacks     * 0.50 * (1.0 - smoothstep(0.0, 0.25, L));
+  c += uWhites     * 0.50 * smoothstep(0.75, 1.0, L);
+
+  /* 6. HSL per band -------------------------------------------------- */
+  // Each band has a centre hue; pixels near it get weighted hue/sat/lum tweaks.
+  const float centers[7] = float[7](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 300.0);
+  vec3 hsl = rgb2hsl(clamp(c, 0.0, 1.0));
+  float hueDeg = hsl.x * 360.0;
+  float hueShift = 0.0, satMul = 1.0, lumAdd = 0.0;
+  for(int i=0;i<7;i++){
+    float dist = abs(hueDeg - centers[i]);
+    dist = min(dist, 360.0 - dist);
+    float w = smoothstep(1.0, 0.0, dist/45.0) * hsl.y; // gate by saturation
+    hueShift += uHslHue[i] * 30.0 * w;                 // +/- 30 deg max
+    satMul   *= (1.0 + uHslSat[i] * w);
+    lumAdd   += uHslLum[i] * 0.5 * w;
+  }
+  hsl.x = fract(hsl.x + hueShift/360.0);
+  hsl.y = clamp(hsl.y * satMul, 0.0, 1.0);
+  hsl.z = clamp(hsl.z + lumAdd, 0.0, 1.0);
+  c = hsl2rgb(hsl);
+
+  /* 7. Saturation + Vibrance ----------------------------------------- */
+  float L2 = luma(c);
+  c = mix(vec3(L2), c, 1.0 + uSaturation);             // global saturation
+  float mx = max(max(c.r,c.g),c.b);
+  float mn = min(min(c.r,c.g),c.b);
+  float sat = mx - mn;
+  c = mix(vec3(luma(c)), c, 1.0 + uVibrance*(1.0 - sat)); // protect saturated
+
+  return c;
+}
+
+void main(){
+  vec3 orig   = texture(uImage, vUv).rgb;
+  vec3 graded = applyGrade(orig);
+
+  // Left of the divider = original (before), right = graded (after).
+  vec3 outc = (uShowSplit && vUv.x < uSplit) ? orig : graded;
+  fragColor = vec4(clamp(outc, 0.0, 1.0), 1.0);
+}`;
+
+// --- compile helpers ---
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    console.error(gl.getShaderInfoLog(sh));
+    document.getElementById('statusText').textContent = 'Shader error (see console).';
+  }
+  return sh;
+}
+let program, uniforms = {};
+function buildProgram(){
+  program = gl.createProgram();
+  gl.attachShader(program, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, FRAG));
+  gl.bindAttribLocation(program, 0, 'aPos');
+  gl.linkProgram(program);
+  if(!gl.getProgramParameter(program, gl.LINK_STATUS)){
+    console.error(gl.getProgramInfoLog(program));
+  }
+  gl.useProgram(program);
+
+  // Cache every uniform location we will set each frame.
+  const names = ['uImage','uSplit','uShowSplit','uTemp','uTint','uExposure',
+    'uContrast','uHighlights','uShadows','uWhites','uBlacks',
+    'uLift','uGamma','uGain','uSaturation','uVibrance',
+    'uHslHue[0]','uHslSat[0]','uHslLum[0]'];
+  names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
+}
+
+// Full-screen quad (triangle strip).
+function buildQuad(){
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER,
+    new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+}
+
+// Texture that holds the current preview image.
+let tex, imgW = 800, imgH = 500;
+function buildTexture(){
+  tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
+function uploadImage(src){
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);  // images are top-down
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+  imgW = src.width; imgH = src.height;
+  canvas.width = imgW; canvas.height = imgH;
+  gl.viewport(0,0,imgW,imgH);
+  document.getElementById('resText').textContent = imgW + ' × ' + imgH;
+  render();
+}
+
+/* --------------------------------------------------------------------------
+   4. RENDER — push state to the shader and draw.
+   -------------------------------------------------------------------------- */
+function render(){
+  if(!program) return;
+  gl.useProgram(program);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(uniforms['uImage'], 0);
+
+  gl.uniform1f(uniforms['uSplit'], splitPos);
+  gl.uniform1i(uniforms['uShowSplit'], splitOn ? 1 : 0);
+
+  gl.uniform1f(uniforms['uTemp'], grade.temp);
+  gl.uniform1f(uniforms['uTint'], grade.tint);
+  gl.uniform1f(uniforms['uExposure'], grade.exposure);
+  gl.uniform1f(uniforms['uContrast'], grade.contrast);
+  gl.uniform1f(uniforms['uHighlights'], grade.highlights);
+  gl.uniform1f(uniforms['uShadows'], grade.shadows);
+  gl.uniform1f(uniforms['uWhites'], grade.whites);
+  gl.uniform1f(uniforms['uBlacks'], grade.blacks);
+
+  gl.uniform3fv(uniforms['uLift'],  liftVec());
+  gl.uniform3fv(uniforms['uGamma'], gammaVec());
+  gl.uniform3fv(uniforms['uGain'],  gainVec());
+
+  gl.uniform1fv(uniforms['uHslHue[0]'], grade.hsl.hue);
+  gl.uniform1fv(uniforms['uHslSat[0]'], grade.hsl.sat);
+  gl.uniform1fv(uniforms['uHslLum[0]'], grade.hsl.lum);
+
+  gl.uniform1f(uniforms['uSaturation'], grade.saturation);
+  gl.uniform1f(uniforms['uVibrance'], grade.vibrance);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+/* --------------------------------------------------------------------------
+   5. DEFAULT TEST IMAGE — so the tool works before any upload.
+      A gradient + colour swatches + a skin-tone patch to judge looks.
+   -------------------------------------------------------------------------- */
+function makeDefaultImage(){
+  const c = document.createElement('canvas');
+  c.width = 800; c.height = 500;
+  const x = c.getContext('2d');
+  // sky-to-ground vertical gradient
+  const g = x.createLinearGradient(0,0,0,500);
+  g.addColorStop(0,'#3a5a80'); g.addColorStop(.5,'#86756a'); g.addColorStop(1,'#241c16');
+  x.fillStyle = g; x.fillRect(0,0,800,500);
+  // greyscale ramp (to watch contrast / tone)
+  for(let i=0;i<16;i++){
+    const v = Math.round(i/15*255);
+    x.fillStyle = `rgb(${v},${v},${v})`;
+    x.fillRect(40 + i*44, 40, 44, 50);
+  }
+  // colour swatches
+  const cols = ['#c0392b','#e67e22','#f1c40f','#27ae60','#16a085','#2980b9','#8e44ad'];
+  cols.forEach((col,i)=>{ x.fillStyle=col; x.fillRect(40+i*100, 110, 100, 60); });
+  // skin-tone patches (the thing LUTs must not wreck)
+  const skins = ['#f1c6a8','#d9a07a','#a9745a','#5c3b2e'];
+  skins.forEach((s,i)=>{ x.fillStyle=s; x.beginPath();
+    x.arc(140+i*180, 330, 55, 0, Math.PI*2); x.fill(); });
+  x.fillStyle='rgba(245,243,239,.85)';
+  x.font='600 22px "Space Grotesk", sans-serif';
+  x.fillText('LUT GEN · load your own image to grade', 40, 470);
+  return c;
+}
+
+/* --------------------------------------------------------------------------
+   6. CONTROL UI GENERATION
+   -------------------------------------------------------------------------- */
+const controlsEl = document.getElementById('controls');
+
+// Generic collapsible section.
+function addSection(title, open=false){
+  const d = document.createElement('details');
+  d.className = 'section';
+  if(open) d.open = true;
+  d.innerHTML = `<summary><span class="chev">▶</span>${title}<span class="tag"></span></summary>`;
+  const body = document.createElement('div');
+  body.className = 'section-body';
+  d.appendChild(body);
+  controlsEl.appendChild(d);
+  return body;
+}
+
+// A labelled slider bound to a getter/setter so it works for nested state too.
+function addSlider(parent, opts){
+  const {label, min, max, step, get, set, fmt} = opts;
+  const wrap = document.createElement('div'); wrap.className = 'ctrl';
+  const fmtFn = fmt || (v => (v>0?'+':'') + v.toFixed(2));
+  wrap.innerHTML =
+    `<div class="row"><label>${label}</label><span class="val"></span></div>`;
+  const input = document.createElement('input');
+  input.type='range'; input.min=min; input.max=max; input.step=step;
+  input.value = get();
+  wrap.appendChild(input);
+  const val = wrap.querySelector('.val');
+  const refresh = ()=>{ val.textContent = fmtFn(get()); };
+  refresh();
+  input.addEventListener('input', ()=>{
+    set(parseFloat(input.value)); refresh(); render();
+  });
+  // allow external refresh (used by HSL band switching + global reset)
+  input._refresh = ()=>{ input.value = get(); refresh(); };
+  parent.appendChild(wrap);
+  return input;
+}
+
+// 3-way colour wheel control bound to grade[key] = {x,y,level}.
+function addWheel(parent, key, name){
+  const unit = document.createElement('div'); unit.className='wheel-unit';
+  unit.innerHTML = `<div class="name">${name}</div>
+    <div class="wheel"><div class="knob"></div></div>`;
+  parent.appendChild(unit);
+
+  const wheel = unit.querySelector('.wheel');
+  const knob  = unit.querySelector('.knob');
+  // Read the state live via grade[key] so it survives a "Reset Grade"
+  // (which replaces the whole grade object).
+  const st = ()=> grade[key];
+
+  // place knob from current x,y (y up = positive)
+  function place(){
+    knob.style.left = (50 + st().x*50) + '%';
+    knob.style.top  = (50 - st().y*50) + '%';
+  }
+  place();
+
+  let dragging = false;
+  function setFromEvent(e){
+    const r = wheel.getBoundingClientRect();
+    let nx = ( (e.clientX - r.left) / r.width  - 0.5) * 2;  //  -1..1
+    let ny = -( (e.clientY - r.top ) / r.height - 0.5) * 2; //  invert (up = +)
+    const len = Math.hypot(nx,ny);
+    if(len > 1){ nx/=len; ny/=len; }                        // clamp to circle
+    st().x = nx; st().y = ny; place(); render();
+  }
+  wheel.addEventListener('pointerdown', e=>{
+    dragging=true; wheel.setPointerCapture(e.pointerId); setFromEvent(e);
+  });
+  wheel.addEventListener('pointermove', e=>{ if(dragging) setFromEvent(e); });
+  wheel.addEventListener('pointerup',   ()=> dragging=false);
+  // double-click resets the wheel colour (keeps level)
+  wheel.addEventListener('dblclick', ()=>{ st().x=0; st().y=0; place(); render(); });
+
+  // master level slider beneath the wheel
+  const lvl = document.createElement('div'); lvl.className='lvl';
+  unit.appendChild(lvl);
+  const lvlInput = addSlider(lvl, {
+    label:'Level', min:-1, max:1, step:0.01,
+    get:()=>st().level, set:v=>st().level=v
+  });
+
+  unit._replace = ()=>{ place(); lvlInput._refresh(); };
+  return unit;
+}
+
+// Keep references so reset + band-switch can refresh the inputs.
+const sliderRefs = [];   // all flat sliders
+const wheelRefs  = [];   // 3-way wheels
+let hslSliders = {};     // {hue, sat, lum} inputs for the active band
+
+function buildUI(){
+  /* --- White Balance --- */
+  let b = addSection('White Balance', true);
+  sliderRefs.push(addSlider(b,{label:'Temperature',min:-1,max:1,step:0.01,
+    get:()=>grade.temp,set:v=>grade.temp=v}));
+  sliderRefs.push(addSlider(b,{label:'Tint',min:-1,max:1,step:0.01,
+    get:()=>grade.tint,set:v=>grade.tint=v}));
+
+  /* --- Tone --- */
+  b = addSection('Tone', true);
+  sliderRefs.push(addSlider(b,{label:'Exposure',min:-3,max:3,step:0.01,
+    get:()=>grade.exposure,set:v=>grade.exposure=v,
+    fmt:v=>(v>0?'+':'')+v.toFixed(2)+' EV'}));
+  sliderRefs.push(addSlider(b,{label:'Contrast',min:-1,max:1,step:0.01,
+    get:()=>grade.contrast,set:v=>grade.contrast=v}));
+  sliderRefs.push(addSlider(b,{label:'Highlights',min:-1,max:1,step:0.01,
+    get:()=>grade.highlights,set:v=>grade.highlights=v}));
+  sliderRefs.push(addSlider(b,{label:'Shadows',min:-1,max:1,step:0.01,
+    get:()=>grade.shadows,set:v=>grade.shadows=v}));
+  sliderRefs.push(addSlider(b,{label:'Whites',min:-1,max:1,step:0.01,
+    get:()=>grade.whites,set:v=>grade.whites=v}));
+  sliderRefs.push(addSlider(b,{label:'Blacks',min:-1,max:1,step:0.01,
+    get:()=>grade.blacks,set:v=>grade.blacks=v}));
+
+  /* --- 3-Way Color --- */
+  b = addSection('3-Way Color (Lift / Gamma / Gain)', true);
+  const wheelsRow = document.createElement('div'); wheelsRow.className='wheels';
+  b.appendChild(wheelsRow);
+  wheelRefs.push(addWheel(wheelsRow,'lift','Lift'));
+  wheelRefs.push(addWheel(wheelsRow,'gamma','Gamma'));
+  wheelRefs.push(addWheel(wheelsRow,'gain','Gain'));
+
+  /* --- HSL --- */
+  b = addSection('HSL / Color Mixer');
+  const tabs = document.createElement('div'); tabs.className='band-tabs';
+  b.appendChild(tabs);
+  const tabHues = [0,30,60,120,180,240,300];   // for the tab swatch colours
+  HSL_BANDS.forEach((name,i)=>{
+    const btn=document.createElement('button');
+    btn.title=name;
+    btn.style.background = `hsl(${tabHues[i]} 70% 50%)`;
+    if(i===0) btn.classList.add('active');
+    btn.addEventListener('click',()=>{
+      activeBand=i;
+      [...tabs.children].forEach(c=>c.classList.remove('active'));
+      btn.classList.add('active');
+      refreshHsl();
+    });
+    tabs.appendChild(btn);
+  });
+  hslSliders.hue = addSlider(b,{label:'Hue',min:-1,max:1,step:0.01,
+    get:()=>grade.hsl.hue[activeBand], set:v=>grade.hsl.hue[activeBand]=v});
+  hslSliders.sat = addSlider(b,{label:'Saturation',min:-1,max:1,step:0.01,
+    get:()=>grade.hsl.sat[activeBand], set:v=>grade.hsl.sat[activeBand]=v});
+  hslSliders.lum = addSlider(b,{label:'Luminance',min:-1,max:1,step:0.01,
+    get:()=>grade.hsl.lum[activeBand], set:v=>grade.hsl.lum[activeBand]=v});
+
+  /* --- Overall Color --- */
+  b = addSection('Saturation & Vibrance');
+  sliderRefs.push(addSlider(b,{label:'Saturation',min:-1,max:1,step:0.01,
+    get:()=>grade.saturation,set:v=>grade.saturation=v}));
+  sliderRefs.push(addSlider(b,{label:'Vibrance',min:-1,max:1,step:0.01,
+    get:()=>grade.vibrance,set:v=>grade.vibrance=v}));
+}
+function refreshHsl(){
+  hslSliders.hue._refresh();
+  hslSliders.sat._refresh();
+  hslSliders.lum._refresh();
+}
+
+/* --------------------------------------------------------------------------
+   7. SPLIT SLIDER (drag the divider)
+   -------------------------------------------------------------------------- */
+const handle = document.getElementById('splitHandle');
+const wrap   = document.getElementById('previewWrap');
+function positionHandle(){ handle.style.left = (splitPos*100) + '%'; }
+function updateSplitFromX(clientX){
+  const r = canvas.getBoundingClientRect();
+  splitPos = Math.max(0, Math.min(1, (clientX - r.left)/r.width));
+  positionHandle(); render();
+}
+let dragSplit=false;
+handle.addEventListener('pointerdown', e=>{
+  dragSplit=true; handle.setPointerCapture(e.pointerId); e.preventDefault();
+});
+handle.addEventListener('pointermove', e=>{ if(dragSplit) updateSplitFromX(e.clientX); });
+handle.addEventListener('pointerup',   ()=> dragSplit=false);
+
+/* --------------------------------------------------------------------------
+   8. TOP-BAR BUTTONS + IMAGE UPLOAD
+   -------------------------------------------------------------------------- */
+const fileInput = document.getElementById('fileInput');
+document.getElementById('btnLoad').addEventListener('click',()=> fileInput.click());
+fileInput.addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const img = new Image();
+  img.onload = ()=>{ uploadImage(img); URL.revokeObjectURL(img.src); };
+  img.src = URL.createObjectURL(f);
+});
+// drag & drop onto the preview
+['dragover','drop'].forEach(ev=>{
+  document.getElementById('previewPane').addEventListener(ev, e=>{
+    e.preventDefault();
+    if(ev==='drop' && e.dataTransfer.files[0]){
+      const img=new Image();
+      img.onload=()=>{ uploadImage(img); URL.revokeObjectURL(img.src); };
+      img.src=URL.createObjectURL(e.dataTransfer.files[0]);
+    }
+  });
+});
+
+document.getElementById('btnSplit').addEventListener('click', e=>{
+  splitOn = !splitOn;
+  e.target.textContent = 'Split: ' + (splitOn ? 'On':'Off');
+  handle.style.display = splitOn ? 'flex':'none';
+  document.getElementById('beforeLabel').style.display = splitOn?'block':'none';
+  document.getElementById('afterLabel').style.display  = splitOn?'block':'none';
+  render();
+});
+
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  grade = defaultGrade();
+  // refresh every input from the fresh state
+  sliderRefs.forEach(s=>s._refresh());
+  wheelRefs.forEach(w=>w._replace());
+  refreshHsl();
+  render();
+});
+
+/* --------------------------------------------------------------------------
+   9. INIT
+   -------------------------------------------------------------------------- */
+function init(){
+  if(!gl) return;
+  buildProgram();
+  buildQuad();
+  buildTexture();
+  buildUI();
+  uploadImage(makeDefaultImage());   // show something immediately
+  positionHandle();
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 1';
+}
+init();
+</script>
+</body>
+</html>
