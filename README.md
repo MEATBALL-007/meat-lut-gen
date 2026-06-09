@@ -42,6 +42,20 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
 - Applied right after the 3-way colour stage, following the Photoshop "RGB"
   model (per-channel curve, then the master curve on every channel).
 
+**Phase 4 — Reference look-match ✅**
+
+- Load a **reference still** (button, click the thumbnail, or drop) and the grade
+  automatically matches the source image's colour to it — a Reinhard-style
+  **statistical transfer**: match the per-channel **mean & standard deviation**
+  in a decorrelated **Rec.709 YCbCr** space (mean of Y = exposure, std of Y =
+  contrast, Cb/Cr mean = colour cast, Cb/Cr std = saturation spread).
+- Image statistics are measured in JS on a 128×128 downsample; the shader does a
+  cheap per-pixel affine map `ycc' = (ycc - srcMean)·(refStd/srcStd) + refMean`,
+  blended by an **Amount** slider (auto-set to 100% on first load).
+- Runs as the **first** grade stage, so curves / split toning / fade refine on
+  top. **Amount 0 (or no reference) is an exact identity**; with fixed stats the
+  transfer is a plain RGB→RGB function, so it bakes into the LUT exactly.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -59,6 +73,6 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 
 ## Roadmap
 
-~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · reference look-match ·
+~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · ~~reference look-match~~ ·
 film-stock presets · auto variations · multi-image + motion preview · scopes ·
 log/color space · multi-format LUT export · auto cover image · pack workflow.

@@ -267,6 +267,18 @@ input[type=range]::-moz-range-thumb{
 .curve-hint{ font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5; }
 .curve-hint a{ color:var(--accent-2); cursor:pointer; text-decoration:underline; }
 
+/* Reference look-match */
+.match-row{ display:flex; gap:10px; align-items:center; margin:6px 0 12px; }
+.match-thumb{
+  width:54px; height:54px; border-radius:6px; flex:0 0 auto; overflow:hidden;
+  background:var(--surface-2); border:1px dashed var(--line); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:9px; color:var(--text-dim); text-align:center;
+}
+.match-thumb.has-ref{ border-style:solid; border-color:var(--accent); }
+.match-thumb canvas{ width:100%; height:100%; display:block; }
+.match-row .col{ flex:1; min-width:0; }
+
 .note{
   font-size:11px; color:var(--text-dim); line-height:1.5;
   background:var(--surface-2); border:1px solid var(--line);
@@ -319,10 +331,10 @@ footer .dot{ color:var(--ok); }
   <!-- Controls (sections are generated into here by JS) -->
   <aside class="controls" id="controls">
     <div class="note">
-      <b>Phase 3 — Tone curve.</b><br>
-      Grade runs live in a WebGL2 shader. Shape the RGB &amp; per-channel
-      curves (click to add points, drag to bend), tint with Split Toning, and
-      add a matte fade. Drag the divider to compare before / after.
+      <b>Phase 4 — Reference look-match.</b><br>
+      Load a reference still and let the grade match its colour automatically
+      (statistical YCbCr transfer), then refine with curves, split toning and
+      the matte fade. Drag the divider to compare before / after.
     </div>
     <!-- sections injected here -->
   </aside>
@@ -337,7 +349,7 @@ footer .dot{ color:var(--ok); }
 
 <script>
 /* ============================================================================
-   LUT GEN — PHASE 3  (tone curve on the Phase 1/2 engine)
+   LUT GEN — PHASE 4  (reference look-match on the Phase 1/2/3 engine)
    ----------------------------------------------------------------------------
    Everything is vanilla JS. The grade is computed entirely in a single WebGL2
    fragment shader so the preview is real-time and — importantly — the SAME math
@@ -349,6 +361,13 @@ footer .dot{ color:var(--ok); }
    the JS side whenever a point moves; the shader just samples it (R/G/B curves
    in .rgb, the master "RGB" curve in .a). The default diagonal bakes to an
    exact identity LUT, and a half-texel sample correction keeps it bit-exact.
+
+   Reference look-match (Phase 4) is a Reinhard-style statistical colour
+   transfer: we measure the mean/std of the source and the reference image (in
+   YCbCr, computed in JS on a downsample) and the shader applies a per-pixel
+   affine match  ycc' = (ycc - srcMean) * (refStd/srcStd) + refMean,  blended by
+   an Amount. Amount 0 (or no reference) is an exact identity; with fixed stats
+   it is a plain RGB->RGB function, so it bakes into the LUT exactly.
 
    COLOR-SCIENCE NOTE (Phase 1 default, easy to revisit):
    We grade directly on the image's stored 0..1 RGB values (display / encoded
@@ -385,6 +404,9 @@ function defaultGrade(){
     },
     // Overall colour
     saturation:0, vibrance:0,
+    // Reference look-match (statistical transfer); amount 0 = identity.
+    // The src/ref statistics themselves live outside `grade` (image-derived).
+    match:{ amount:0 },
     // Split toning — tint shadows & highlights toward separate hues.
     // Default hues = classic teal shadows / warm highlights; sat 0 = identity.
     split:{ shadowHue:215, shadowSat:0, highHue:45, highSat:0, balance:0 },
@@ -400,6 +422,12 @@ let splitOn   = true;   // before/after compare active?
 let splitPos  = 0.5;    // 0..1 divider position
 let activeBand = 0;     // which HSL band the sliders currently edit
 let activeCurve = 'rgb';// which tone curve the editor currently edits
+
+/* Reference look-match statistics (YCbCr mean/std). Image-derived, not part of
+   the exported "look" object. srcStats = current source image; refStats = the
+   loaded reference (null until one is loaded). */
+let srcStats = {mean:[0,0,0], std:[1,1,1]};
+let refStats = null;
 
 /* --------------------------------------------------------------------------
    2. COLOR HELPERS (JS side)
@@ -477,6 +505,33 @@ function makeSpline(points){
   };
 }
 
+// Draw an image/canvas into ctx with "cover" fit (fill box, crop overflow).
+function drawCover(ctx, img, w, h){
+  const ir = img.width/img.height, br = w/h;
+  let dw, dh; if(ir > br){ dh = h; dw = h*ir; } else { dw = w; dh = w/ir; }
+  ctx.drawImage(img, (w-dw)/2, (h-dh)/2, dw, dh);
+}
+// Mean & std of an image in Rec.709 YCbCr (Cb/Cr centred at 0), computed on a
+// 128x128 downsample. Used by reference look-match (source & reference).
+function computeStats(img){
+  const S = 128;
+  const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+  const ctx = cv.getContext('2d');
+  drawCover(ctx, img, S, S);
+  const data = ctx.getImageData(0, 0, S, S).data;
+  const sum = [0,0,0], sumSq = [0,0,0]; let n = 0;
+  for(let i=0;i<data.length;i+=4){
+    const r = data[i]/255, g = data[i+1]/255, b = data[i+2]/255;
+    const y = 0.2126*r + 0.7152*g + 0.0722*b;
+    const v = [y, (b-y)/1.8556, (r-y)/1.5748];
+    for(let k=0;k<3;k++){ sum[k]+=v[k]; sumSq[k]+=v[k]*v[k]; }
+    n++;
+  }
+  const mean = sum.map(s=>s/n);
+  const std  = sumSq.map((sq,k)=>Math.sqrt(Math.max(0, sq/n - mean[k]*mean[k])));
+  return {mean, std};
+}
+
 /* --------------------------------------------------------------------------
    3. WEBGL2 SETUP
    -------------------------------------------------------------------------- */
@@ -524,9 +579,23 @@ uniform float uSplitHighHue,   uSplitHighSat;
 uniform float uSplitBalance;
 /* Faded black (matte) */
 uniform float uFade, uFadeRolloff;
+/* Reference look-match (YCbCr mean/std transfer) */
+uniform vec3  uSrcMean, uSrcStd, uRefMean, uRefStd;
+uniform float uMatchAmount;
 
 const float PI = 3.14159265;
 float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+/* Rec.709 RGB <-> YCbCr (Cb/Cr centred at 0). Used by reference look-match. */
+vec3 rgb2ycc(vec3 c){
+  float y = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  return vec3(y, (c.b - y)/1.8556, (c.r - y)/1.5748);
+}
+vec3 ycc2rgb(vec3 v){
+  return vec3(v.x + 1.5748*v.z,
+             v.x - 0.187324*v.y - 0.468124*v.z,
+             v.x + 1.8556*v.y);
+}
 
 /* ---- RGB <-> HSL ---- */
 vec3 rgb2hsl(vec3 c){
@@ -573,6 +642,16 @@ vec4 lutAt(float x){
    an identity LUT grid to bake the .cube export.
    ===================================================================== */
 vec3 applyGrade(vec3 c){
+
+  /* 0. Reference look-match ------------------------------------------ */
+  // Reinhard-style statistical transfer in YCbCr: shift/scale each channel so
+  // the source's mean/std becomes the reference's, blended by Amount. With
+  // fixed stats this is a plain per-pixel RGB->RGB map (bakes into the LUT).
+  if(uMatchAmount > 0.0){
+    vec3 ycc = rgb2ycc(c);
+    ycc = (ycc - uSrcMean) * (uRefStd / max(uSrcStd, vec3(1e-4))) + uRefMean;
+    c = mix(c, ycc2rgb(ycc), uMatchAmount);
+  }
 
   /* 1. White balance ------------------------------------------------- */
   // temp +: warmer (boost R, cut B).  tint +: magenta (cut G).
@@ -698,7 +777,8 @@ function buildProgram(){
     'uLift','uGamma','uGain','uSaturation','uVibrance',
     'uHslHue[0]','uHslSat[0]','uHslLum[0]',
     'uSplitShadowHue','uSplitShadowSat','uSplitHighHue','uSplitHighSat',
-    'uSplitBalance','uFade','uFadeRolloff'];
+    'uSplitBalance','uFade','uFadeRolloff',
+    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount'];
   names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
 }
 
@@ -762,6 +842,7 @@ function uploadImage(src){
   canvas.width = imgW; canvas.height = imgH;
   gl.viewport(0,0,imgW,imgH);
   document.getElementById('resText').textContent = imgW + ' × ' + imgH;
+  srcStats = computeStats(src);          // for reference look-match
   render();
 }
 
@@ -808,6 +889,14 @@ function render(){
   gl.uniform1f(uniforms['uSplitBalance'],   grade.split.balance);
   gl.uniform1f(uniforms['uFade'],           grade.fade);
   gl.uniform1f(uniforms['uFadeRolloff'],    grade.fadeRolloff);
+
+  // Reference look-match: ref falls back to src (=> identity) when none loaded.
+  const rs = refStats || srcStats;
+  gl.uniform3fv(uniforms['uSrcMean'], srcStats.mean);
+  gl.uniform3fv(uniforms['uSrcStd'],  srcStats.std);
+  gl.uniform3fv(uniforms['uRefMean'], rs.mean);
+  gl.uniform3fv(uniforms['uRefStd'],  rs.std);
+  gl.uniform1f(uniforms['uMatchAmount'], grade.match.amount);
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
@@ -1058,14 +1147,74 @@ function buildCurveEditor(parent){
   redraw();
 }
 
+/* Reference look-match panel: load a reference still (button / click thumb /
+   drop), measure its YCbCr stats, and expose an Amount blend. */
+function buildMatchUI(parent){
+  const row = document.createElement('div'); row.className = 'match-row';
+  const thumb = document.createElement('div'); thumb.className = 'match-thumb';
+  thumb.textContent = 'no ref';
+  const col = document.createElement('div'); col.className = 'col';
+  const btn = document.createElement('button'); btn.className = 'btn';
+  btn.textContent = 'Load Reference'; btn.style.width = '100%';
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.hidden = true;
+  col.appendChild(btn); col.appendChild(input);
+  row.appendChild(thumb); row.appendChild(col);
+  parent.appendChild(row);
+
+  const amt = addSlider(parent, {label:'Amount', min:0, max:1, step:0.01,
+    get:()=>grade.match.amount, set:v=>grade.match.amount=v,
+    fmt:v=>Math.round(v*100)+'%'});
+  sliderRefs.push(amt);
+
+  const hint = document.createElement('div'); hint.className = 'curve-hint';
+  hint.innerHTML = 'Matches the source colour to the reference (mean/std). ';
+  const clear = document.createElement('a'); clear.textContent = 'clear reference';
+  hint.appendChild(clear);
+  parent.appendChild(hint);
+
+  function showThumb(img){
+    const c = document.createElement('canvas'); c.width = 54; c.height = 54;
+    drawCover(c.getContext('2d'), img, 54, 54);
+    thumb.innerHTML = ''; thumb.appendChild(c); thumb.classList.add('has-ref');
+  }
+  function loadRef(file){
+    if(!file) return;
+    const img = new Image();
+    img.onload = ()=>{
+      refStats = computeStats(img);
+      showThumb(img);
+      if(grade.match.amount === 0){ grade.match.amount = 1; amt._refresh(); } // auto-apply
+      render();
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+  }
+  btn.addEventListener('click', ()=>input.click());
+  thumb.addEventListener('click', ()=>input.click());
+  input.addEventListener('change', e=>loadRef(e.target.files[0]));
+  ['dragover','drop'].forEach(ev=>thumb.addEventListener(ev, e=>{
+    e.preventDefault(); e.stopPropagation();
+    if(ev === 'drop' && e.dataTransfer.files[0]) loadRef(e.dataTransfer.files[0]);
+  }));
+  clear.addEventListener('click', ()=>{
+    refStats = null; thumb.innerHTML = 'no ref'; thumb.classList.remove('has-ref');
+    grade.match.amount = 0; amt._refresh(); render();
+  });
+}
+
 // Keep references so reset + band-switch can refresh the inputs.
 const sliderRefs = [];   // all flat sliders
 const wheelRefs  = [];   // 3-way wheels
 let hslSliders = {};     // {hue, sat, lum} inputs for the active band
 
 function buildUI(){
+  /* --- Reference Match (Phase 4) --- */
+  let b = addSection('Reference Match', true);
+  buildMatchUI(b);
+
   /* --- White Balance --- */
-  let b = addSection('White Balance', true);
+  b = addSection('White Balance', true);
   sliderRefs.push(addSlider(b,{label:'Temperature',min:-1,max:1,step:0.01,
     get:()=>grade.temp,set:v=>grade.temp=v}));
   sliderRefs.push(addSlider(b,{label:'Tint',min:-1,max:1,step:0.01,
@@ -1236,7 +1385,7 @@ function init(){
   bakeCurves();                      // identity LUT before first render
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 3';
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 4';
 }
 init();
 </script>

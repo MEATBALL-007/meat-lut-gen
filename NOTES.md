@@ -35,6 +35,7 @@ Helper ที่มีให้ใช้:
 - `addWheel(parent, key, name)` — color wheel 3-way
 
 ## ลำดับ Pipeline ใน `applyGrade` (จุดสำหรับแทรกขั้นตอนใหม่)
+0. **Reference look-match** (Phase 4) — YCbCr mean/std transfer (มาก่อนทุกอย่าง)
 1. White balance
 2. Exposure
 3. Contrast
@@ -45,6 +46,15 @@ Helper ที่มีให้ใช้:
 7. Saturation + Vibrance
 8. **Split toning** (Phase 2)
 9. **Faded black** (Phase 2)
+
+> **Reference look-match (Phase 4):** Reinhard-style statistical transfer.
+> วัด mean/std ของภาพใน **Rec.709 YCbCr** ด้วย JS (`computeStats`, downsample
+> 128×128) → ส่งเป็น uniform `uSrcMean/Std`, `uRefMean/Std`, `uMatchAmount`.
+> Shader ทำ affine ต่อพิกเซล `ycc'=(ycc-srcMean)*(refStd/srcStd)+refMean` แล้ว
+> blend ด้วย Amount. `srcStats`/`refStats` อยู่นอก object `grade` (มาจากภาพ ไม่ใช่
+> ส่วนของ "look"); มีแค่ `grade.match.amount` ที่เป็นค่าปรับได้. **Amount 0 หรือ
+> ไม่มี ref = identity เป๊ะ** (โค้ด `if(uMatchAmount>0.0)` ข้ามทั้ง block) →
+> ปลอดภัยต่อการ bake LUT.
 
 > **Tone curve (Phase 3):** baked into a 256×1 RGBA 1D-LUT texture บน **texture
 > unit 1** (`uCurveLUT`) ทุกครั้งที่จุดขยับ — shader แค่ sample (R/G/B ใน `.rgb`,
@@ -58,8 +68,8 @@ Helper ที่มีให้ใช้:
 - [x] **Phase 1** — Core grading engine
 - [x] **Phase 2** — Split toning + Faded black
 - [x] **Phase 3** — Tone curve (RGB + R/G/B, baked 1D-LUT)
-- [ ] **Phase 4** — Reference look-match *(ถัดไป)*
-- [ ] **Phase 5** — Film-stock presets
+- [x] **Phase 4** — Reference look-match (YCbCr mean/std transfer)
+- [ ] **Phase 5** — Film-stock presets *(ถัดไป)*
 - [ ] **Phase 6** — Auto variations
 - [ ] Multi-image + motion preview · Scopes
 - [ ] **Phase 7** — Log / color space
