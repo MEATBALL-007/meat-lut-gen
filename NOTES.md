@@ -39,17 +39,26 @@ Helper ที่มีให้ใช้:
 2. Exposure
 3. Contrast
 4. 3-way color (gain → lift → gamma)
+4b. **Tone curves** (Phase 3) — per-channel R/G/B then master RGB
 5. Tonal regions (highlights / shadows / whites / blacks)
 6. HSL per band
 7. Saturation + Vibrance
 8. **Split toning** (Phase 2)
 9. **Faded black** (Phase 2)
 
+> **Tone curve (Phase 3):** baked into a 256×1 RGBA 1D-LUT texture บน **texture
+> unit 1** (`uCurveLUT`) ทุกครั้งที่จุดขยับ — shader แค่ sample (R/G/B ใน `.rgb`,
+> master ใน `.a`). ใช้ monotone-cubic spline (`makeSpline`) + half-texel
+> correction ใน shader เพื่อให้ diagonal = identity เป๊ะ. State อยู่ใน
+> `grade.curves.{rgb,r,g,b}` เป็น list ของจุด `[x,y]` ใน 0..1.
+> การเพิ่ม control แบบใช้ texture ต้องจัดการ `gl.activeTexture` unit ให้ถูก
+> (image = unit 0, curve LUT = unit 1) และ rebind ทุก frame ใน `render()`.
+
 ## Roadmap / Phases
 - [x] **Phase 1** — Core grading engine
 - [x] **Phase 2** — Split toning + Faded black
-- [ ] **Phase 3** — Curve editor *(ถัดไป)*
-- [ ] **Phase 4** — Reference look-match
+- [x] **Phase 3** — Tone curve (RGB + R/G/B, baked 1D-LUT)
+- [ ] **Phase 4** — Reference look-match *(ถัดไป)*
 - [ ] **Phase 5** — Film-stock presets
 - [ ] **Phase 6** — Auto variations
 - [ ] Multi-image + motion preview · Scopes

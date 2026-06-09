@@ -248,6 +248,25 @@ input[type=range]::-moz-range-thumb{
 }
 .band-tabs button.active{ border-color:var(--text); }
 
+/* Tone-curve editor */
+.curve-tabs{ display:flex; gap:4px; margin:4px 0 10px; }
+.curve-tabs button{
+  flex:1; height:24px; border-radius:4px; cursor:pointer;
+  background:var(--surface-2); border:1px solid var(--line);
+  font-family:var(--font-mono); font-size:11px; font-weight:700;
+}
+.curve-tabs button.active{ border-color:var(--text); }
+.curve-svg{
+  width:100%; aspect-ratio:1/1; display:block; touch-action:none;
+  background:var(--surface-2); border:1px solid var(--line); border-radius:6px;
+}
+.curve-svg .grid{ stroke:var(--line); stroke-width:.5; }
+.curve-svg .baseline{ stroke:var(--text-dim); stroke-width:.5; stroke-dasharray:2 2; opacity:.5; }
+.curve-svg .curve-line{ fill:none; stroke-width:1.6; }
+.curve-svg .curve-pt{ stroke:#111; stroke-width:1; cursor:grab; }
+.curve-hint{ font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5; }
+.curve-hint a{ color:var(--accent-2); cursor:pointer; text-decoration:underline; }
+
 .note{
   font-size:11px; color:var(--text-dim); line-height:1.5;
   background:var(--surface-2); border:1px solid var(--line);
@@ -300,10 +319,10 @@ footer .dot{ color:var(--ok); }
   <!-- Controls (sections are generated into here by JS) -->
   <aside class="controls" id="controls">
     <div class="note">
-      <b>Phase 2 — Split toning &amp; faded black.</b><br>
-      Grade runs live in a WebGL2 shader. Tint shadows &amp; highlights with
-      Split Toning, then add a matte film fade. Drag the divider to compare
-      before / after; load your own image to start crafting a look.
+      <b>Phase 3 — Tone curve.</b><br>
+      Grade runs live in a WebGL2 shader. Shape the RGB &amp; per-channel
+      curves (click to add points, drag to bend), tint with Split Toning, and
+      add a matte fade. Drag the divider to compare before / after.
     </div>
     <!-- sections injected here -->
   </aside>
@@ -318,13 +337,18 @@ footer .dot{ color:var(--ok); }
 
 <script>
 /* ============================================================================
-   LUT GEN — PHASE 2  (split toning + faded black on the Phase 1 engine)
+   LUT GEN — PHASE 3  (tone curve on the Phase 1/2 engine)
    ----------------------------------------------------------------------------
    Everything is vanilla JS. The grade is computed entirely in a single WebGL2
    fragment shader so the preview is real-time and — importantly — the SAME math
    will later be re-run on an identity LUT grid to BAKE an exact .cube export.
-   Every Phase 2 control is an exact identity at its default, so that future
+   Every control is an exact identity at its default, so that future
    neutral-grade round-trip stays numerically exact.
+
+   The tone curve is baked (monotone-cubic) into a 256x1 RGBA 1D-LUT texture on
+   the JS side whenever a point moves; the shader just samples it (R/G/B curves
+   in .rgb, the master "RGB" curve in .a). The default diagonal bakes to an
+   exact identity LUT, and a half-texel sample correction keeps it bit-exact.
 
    COLOR-SCIENCE NOTE (Phase 1 default, easy to revisit):
    We grade directly on the image's stored 0..1 RGB values (display / encoded
@@ -350,6 +374,9 @@ function defaultGrade(){
     lift:  {x:0,y:0,level:0},
     gamma: {x:0,y:0,level:0},
     gain:  {x:0,y:0,level:0},
+    // Tone curves — each is a list of [x,y] points in 0..1; identity = diagonal.
+    // r/g/b are per-channel; rgb is the master curve applied to all channels.
+    curves:{ rgb:[[0,0],[1,1]], r:[[0,0],[1,1]], g:[[0,0],[1,1]], b:[[0,0],[1,1]] },
     // HSL per band (7 entries each)
     hsl:{
       hue: new Array(7).fill(0),
@@ -372,6 +399,7 @@ let grade = defaultGrade();
 let splitOn   = true;   // before/after compare active?
 let splitPos  = 0.5;    // 0..1 divider position
 let activeBand = 0;     // which HSL band the sliders currently edit
+let activeCurve = 'rgb';// which tone curve the editor currently edits
 
 /* --------------------------------------------------------------------------
    2. COLOR HELPERS (JS side)
@@ -420,6 +448,35 @@ function gainVec(){
   return [1 + c[0]*0.40 + lv, 1 + c[1]*0.40 + lv, 1 + c[2]*0.40 + lv];
 }
 
+// Monotone-cubic (Fritsch–Carlson) spline through the curve's control points.
+// Returns f(x)->y in 0..1. Monotone = no overshoot, ideal for tone curves; a
+// straight [[0,0],[1,1]] resolves to f(x)=x exactly (keeps the LUT identity).
+const clamp01 = v => v<0 ? 0 : (v>1 ? 1 : v);
+function makeSpline(points){
+  const p = points.slice().sort((a,b)=>a[0]-b[0]);
+  const n = p.length;
+  if(n === 1){ const y = clamp01(p[0][1]); return ()=>y; }
+  const xs = p.map(q=>q[0]), ys = p.map(q=>q[1]);
+  const dx = [], d = [];
+  for(let i=0;i<n-1;i++){ dx[i] = xs[i+1]-xs[i] || 1e-6; d[i] = (ys[i+1]-ys[i])/dx[i]; }
+  const m = new Array(n);
+  m[0] = d[0]; m[n-1] = d[n-2];
+  for(let i=1;i<n-1;i++) m[i] = (d[i-1]*d[i] <= 0) ? 0 : (d[i-1]+d[i])/2;
+  for(let i=0;i<n-1;i++){
+    if(d[i] === 0){ m[i] = 0; m[i+1] = 0; continue; }
+    const a = m[i]/d[i], b = m[i+1]/d[i], s = a*a + b*b;
+    if(s > 9){ const t = 3/Math.sqrt(s); m[i] = t*a*d[i]; m[i+1] = t*b*d[i]; }
+  }
+  return function(x){
+    if(x <= xs[0])   return clamp01(ys[0]);
+    if(x >= xs[n-1]) return clamp01(ys[n-1]);
+    let i = 0; while(i < n-1 && x > xs[i+1]) i++;
+    const h = dx[i], t = (x-xs[i])/h, t2 = t*t, t3 = t2*t;
+    const h00 = 2*t3-3*t2+1, h10 = t3-2*t2+t, h01 = -2*t3+3*t2, h11 = t3-t2;
+    return clamp01(h00*ys[i] + h10*h*m[i] + h01*ys[i+1] + h11*h*m[i+1]);
+  };
+}
+
 /* --------------------------------------------------------------------------
    3. WEBGL2 SETUP
    -------------------------------------------------------------------------- */
@@ -444,6 +501,7 @@ in vec2 vUv;
 out vec4 fragColor;
 
 uniform sampler2D uImage;
+uniform sampler2D uCurveLUT; // 256x1 baked tone curves (R/G/B in .rgb, master in .a)
 uniform float uSplit;       // divider position 0..1
 uniform bool  uShowSplit;   // before/after compare on?
 
@@ -503,6 +561,13 @@ vec3 hsl2rgb(vec3 hsl){
                hue2rgb(p,q,h - 1.0/3.0) );
 }
 
+/* Sample the baked 256x1 curve LUT at input x. The +0.5/256 half-texel
+   correction makes the diagonal identity LUT reproduce x bit-exactly. */
+vec4 lutAt(float x){
+  float u = (clamp(x, 0.0, 1.0) * 255.0 + 0.5) / 256.0;
+  return texture(uCurveLUT, vec2(u, 0.5));
+}
+
 /* =====================================================================
    THE GRADE — runs per pixel. This exact chain will later be re-run on
    an identity LUT grid to bake the .cube export.
@@ -525,6 +590,11 @@ vec3 applyGrade(vec3 c){
   c = c * uGain;
   c = c + uLift * (1.0 - c);
   c = pow(max(c, 0.0), 1.0 / max(uGamma, vec3(0.001)));
+
+  /* 4b. Tone curves: per-channel R/G/B first, then the master RGB curve
+     applied to each channel (Photoshop "RGB" model). Identity by default. */
+  c.r = lutAt(c.r).r;  c.g = lutAt(c.g).g;  c.b = lutAt(c.b).b;
+  c.r = lutAt(c.r).a;  c.g = lutAt(c.g).a;  c.b = lutAt(c.b).a;
 
   /* 5. Tonal regions (highlights/shadows/whites/blacks) -------------- */
   // NOTE: smoothstep needs ascending edges, so the "dark" masks are inverted.
@@ -623,7 +693,7 @@ function buildProgram(){
   gl.useProgram(program);
 
   // Cache every uniform location we will set each frame.
-  const names = ['uImage','uSplit','uShowSplit','uTemp','uTint','uExposure',
+  const names = ['uImage','uCurveLUT','uSplit','uShowSplit','uTemp','uTint','uExposure',
     'uContrast','uHighlights','uShadows','uWhites','uBlacks',
     'uLift','uGamma','uGain','uSaturation','uVibrance',
     'uHslHue[0]','uHslSat[0]','uHslLum[0]',
@@ -652,8 +722,40 @@ function buildTexture(){
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
+// 256x1 RGBA texture holding the baked tone curves (sampled on texture unit 1).
+let curveTex;
+const CURVE_N = 256;
+const curveData = new Uint8Array(CURVE_N * 4);
+function buildCurveTexture(){
+  curveTex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, curveTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
+// Re-bake all four curves into the LUT texture. Call whenever a point changes.
+function bakeCurves(){
+  const sr = makeSpline(grade.curves.r), sg = makeSpline(grade.curves.g);
+  const sb = makeSpline(grade.curves.b), sm = makeSpline(grade.curves.rgb);
+  const q = v => Math.max(0, Math.min(255, Math.round(v*255)));
+  for(let i=0;i<CURVE_N;i++){
+    const x = i/(CURVE_N-1);
+    curveData[i*4+0] = q(sr(x));
+    curveData[i*4+1] = q(sg(x));
+    curveData[i*4+2] = q(sb(x));
+    curveData[i*4+3] = q(sm(x));
+  }
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, curveTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, CURVE_N, 1, 0,
+    gl.RGBA, gl.UNSIGNED_BYTE, curveData);
+}
 function uploadImage(src){
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);  // images are top-down
+  gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
   imgW = src.width; imgH = src.height;
@@ -672,6 +774,9 @@ function render(){
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.uniform1i(uniforms['uImage'], 0);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, curveTex);
+  gl.uniform1i(uniforms['uCurveLUT'], 1);
 
   gl.uniform1f(uniforms['uSplit'], splitPos);
   gl.uniform1i(uniforms['uShowSplit'], splitOn ? 1 : 0);
@@ -837,6 +942,122 @@ function addWheel(parent, key, name){
   return unit;
 }
 
+/* Interactive tone-curve editor (SVG). Edits grade.curves[activeCurve], a list
+   of [x,y] control points in 0..1. Click empty space to add a point, drag to
+   shape, double-click an interior point to remove it. Endpoints keep x at 0/1
+   but their y (black/white point) can move. */
+const CURVE_CHANNELS = [
+  {key:'rgb', name:'RGB', color:'#F5F3EF'},
+  {key:'r',   name:'R',   color:'#FF5A4D'},
+  {key:'g',   name:'G',   color:'#4ED39B'},
+  {key:'b',   name:'B',   color:'#4D9BFF'},
+];
+let redrawCurveEditor = ()=>{};   // set by buildCurveEditor; used by reset
+function buildCurveEditor(parent){
+  const NS = 'http://www.w3.org/2000/svg';
+
+  // channel tabs
+  const tabs = document.createElement('div'); tabs.className = 'curve-tabs';
+  CURVE_CHANNELS.forEach(ch=>{
+    const btn = document.createElement('button');
+    btn.textContent = ch.name; btn.style.color = ch.color;
+    if(ch.key === activeCurve) btn.classList.add('active');
+    btn.addEventListener('click', ()=>{
+      activeCurve = ch.key;
+      [...tabs.children].forEach(c=>c.classList.remove('active'));
+      btn.classList.add('active');
+      redraw();
+    });
+    tabs.appendChild(btn);
+  });
+  parent.appendChild(tabs);
+
+  // the SVG pad (viewBox 0..100, y inverted so 0 is at the bottom)
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.classList.add('curve-svg');
+  parent.appendChild(svg);
+
+  // hint + per-channel reset
+  const hint = document.createElement('div'); hint.className = 'curve-hint';
+  hint.innerHTML = 'Click to add a point · drag to shape · double-click a point to remove · ';
+  const reset = document.createElement('a'); reset.textContent = 'reset channel';
+  reset.addEventListener('click', ()=>{
+    grade.curves[activeCurve] = [[0,0],[1,1]];
+    bakeCurves(); redraw(); render();
+  });
+  hint.appendChild(reset);
+  parent.appendChild(hint);
+
+  function mk(tag, attrs){
+    const el = document.createElementNS(NS, tag);
+    for(const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function evToXY(e){
+    const r = svg.getBoundingClientRect();
+    return [ clamp01((e.clientX-r.left)/r.width),
+             clamp01(1 - (e.clientY-r.top)/r.height) ];
+  }
+  function changed(){ bakeCurves(); redraw(); render(); }
+
+  let drag = null;   // index of point being dragged
+  function movePoint(idx, e){
+    const pts = grade.curves[activeCurve];
+    let [x,y] = evToXY(e);
+    if(idx === 0) x = 0;
+    else if(idx === pts.length-1) x = 1;
+    else { const eps = 0.001;
+      x = Math.min(pts[idx+1][0]-eps, Math.max(pts[idx-1][0]+eps, x)); }
+    pts[idx] = [x, y];
+    changed();
+  }
+  svg.addEventListener('pointermove', e=>{ if(drag !== null) movePoint(drag, e); });
+  svg.addEventListener('pointerup',   ()=>{ drag = null; });
+  // click on empty space -> add a point there and start dragging it
+  svg.addEventListener('pointerdown', e=>{
+    const [x,y] = evToXY(e);
+    if(x <= 0.01 || x >= 0.99) return;     // don't spawn duplicate endpoints
+    const pts = grade.curves[activeCurve];
+    const np = [x,y]; pts.push(np); pts.sort((a,b)=>a[0]-b[0]);
+    drag = pts.indexOf(np);
+    svg.setPointerCapture(e.pointerId);
+    changed();
+  });
+
+  function redraw(){
+    const pts = grade.curves[activeCurve];
+    const ch  = CURVE_CHANNELS.find(c=>c.key === activeCurve);
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    for(let i=1;i<4;i++){                               // grid
+      svg.appendChild(mk('line',{x1:i*25,y1:0,x2:i*25,y2:100,class:'grid'}));
+      svg.appendChild(mk('line',{x1:0,y1:i*25,x2:100,y2:i*25,class:'grid'}));
+    }
+    svg.appendChild(mk('line',{x1:0,y1:100,x2:100,y2:0,class:'baseline'}));
+    const sp = makeSpline(pts), STEPS = 64; let d = '';   // curve path
+    for(let i=0;i<=STEPS;i++){
+      const x = i/STEPS, y = sp(x);
+      d += (i?'L':'M') + (x*100).toFixed(2) + ' ' + ((1-y)*100).toFixed(2) + ' ';
+    }
+    svg.appendChild(mk('path',{d, class:'curve-line', stroke:ch.color}));
+    pts.forEach((p,idx)=>{                                // control points
+      const dot = mk('circle',{cx:p[0]*100, cy:(1-p[1])*100, r:2.6,
+        class:'curve-pt', fill:ch.color});
+      dot.addEventListener('pointerdown', e=>{
+        e.stopPropagation(); drag = idx; svg.setPointerCapture(e.pointerId);
+      });
+      dot.addEventListener('dblclick', e=>{
+        e.stopPropagation();
+        if(idx === 0 || idx === pts.length-1) return;    // keep endpoints
+        pts.splice(idx,1); changed();
+      });
+      svg.appendChild(dot);
+    });
+  }
+  redrawCurveEditor = redraw;
+  redraw();
+}
+
 // Keep references so reset + band-switch can refresh the inputs.
 const sliderRefs = [];   // all flat sliders
 const wheelRefs  = [];   // 3-way wheels
@@ -873,6 +1094,10 @@ function buildUI(){
   wheelRefs.push(addWheel(wheelsRow,'lift','Lift'));
   wheelRefs.push(addWheel(wheelsRow,'gamma','Gamma'));
   wheelRefs.push(addWheel(wheelsRow,'gain','Gain'));
+
+  /* --- Tone Curve --- */
+  b = addSection('Tone Curve', true);
+  buildCurveEditor(b);
 
   /* --- HSL --- */
   b = addSection('HSL / Color Mixer');
@@ -994,6 +1219,7 @@ document.getElementById('btnReset').addEventListener('click', ()=>{
   sliderRefs.forEach(s=>s._refresh());
   wheelRefs.forEach(w=>w._replace());
   refreshHsl();
+  bakeCurves(); redrawCurveEditor();   // reset the tone curves too
   render();
 });
 
@@ -1005,10 +1231,12 @@ function init(){
   buildProgram();
   buildQuad();
   buildTexture();
+  buildCurveTexture();
   buildUI();
+  bakeCurves();                      // identity LUT before first render
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 2';
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 3';
 }
 init();
 </script>

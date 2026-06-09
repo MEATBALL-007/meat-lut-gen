@@ -30,6 +30,18 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
 - Both new sections are an **exact identity at their defaults**, so the planned
   neutral-grade LUT round-trip (Phase 8) stays numerically exact.
 
+**Phase 3 — Tone curve ✅**
+
+- Interactive **SVG curve editor** with **RGB** (master) + per-channel **R / G
+  / B** curves. Click to add points, drag to shape, double-click a point to
+  remove it; endpoints keep their x but their y (black/white point) can move.
+- Curves use a **monotone-cubic (Fritsch–Carlson)** spline — no overshoot — and
+  are baked into a **256×1 RGBA 1D-LUT texture** (R/G/B in `.rgb`, master in
+  `.a`) that the shader samples. A half-texel sample correction makes the
+  default diagonal a **bit-exact identity**.
+- Applied right after the 3-way colour stage, following the Photoshop "RGB"
+  model (per-channel curve, then the master curve on every channel).
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -47,6 +59,6 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 
 ## Roadmap
 
-~~Split toning~~ · ~~faded black~~ · curve editor · reference look-match ·
+~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · reference look-match ·
 film-stock presets · auto variations · multi-image + motion preview · scopes ·
 log/color space · multi-format LUT export · auto cover image · pack workflow.
