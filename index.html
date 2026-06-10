@@ -1490,7 +1490,7 @@ function buildCurveEditor(parent){
 
   // hint + per-channel reset
   const hint = document.createElement('div'); hint.className = 'curve-hint';
-  hint.innerHTML = 'Click to add a point · drag to shape · double-click a point to remove · ';
+  hint.innerHTML = 'Click to add · drag to shape · double-click or right-click a point to remove · ';
   const reset = document.createElement('a'); reset.textContent = 'reset channel';
   reset.addEventListener('click', ()=>{
     grade.curves[activeCurve] = [[0,0],[1,1]];
@@ -1512,6 +1512,7 @@ function buildCurveEditor(parent){
   function changed(){ bakeCurves(); redraw(); render(); }
 
   let drag = null;   // index of point being dragged
+  let lastTapIdx = -1, lastTapT = 0;   // for capture-proof double-tap deletion
   function movePoint(idx, e){
     const pts = grade.curves[activeCurve];
     let [x,y] = evToXY(e);
@@ -1551,16 +1552,19 @@ function buildCurveEditor(parent){
     }
     svg.appendChild(mk('path',{d, class:'curve-line', stroke:ch.color}));
     pts.forEach((p,idx)=>{                                // control points
-      const dot = mk('circle',{cx:p[0]*100, cy:(1-p[1])*100, r:2.6,
+      const dot = mk('circle',{cx:p[0]*100, cy:(1-p[1])*100, r:3.0,
         class:'curve-pt', fill:ch.color});
+      const del = ()=>{ if(idx !== 0 && idx !== pts.length-1){ pts.splice(idx,1); changed(); } };
       dot.addEventListener('pointerdown', e=>{
-        e.stopPropagation(); drag = idx; svg.setPointerCapture(e.pointerId);
-      });
-      dot.addEventListener('dblclick', e=>{
         e.stopPropagation();
-        if(idx === 0 || idx === pts.length-1) return;    // keep endpoints
-        pts.splice(idx,1); changed();
+        const now = performance.now();
+        if(idx === lastTapIdx && now - lastTapT < 350){   // manual double-tap -> delete
+          lastTapIdx = -1; del(); return;                 // (capture-proof; no drag)
+        }
+        lastTapIdx = idx; lastTapT = now;
+        drag = idx; svg.setPointerCapture(e.pointerId);
       });
+      dot.addEventListener('contextmenu', e=>{ e.preventDefault(); e.stopPropagation(); del(); });
       svg.appendChild(dot);
     });
   }
