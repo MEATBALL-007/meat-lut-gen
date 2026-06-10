@@ -86,6 +86,19 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
   consistent across source spaces. Default Rec.709 keeps the exact identity, and
   because the decode lives inside the shader it bakes into the exported LUT.
 
+**Phase 8 — Multi-format LUT export ✅**
+
+- **Export .cube** (sizes 17 / 33 / 65) and a true **HALD `.png`** (level 8 =
+  64³). The export re-runs the **exact same `applyGrade` shader** over an
+  identity S³ grid rendered to an FBO, reads it back, and serialises it — so the
+  baked LUT matches the live preview pixel-for-pixel.
+- `.cube` loads in Resolve / Premiere / FCP / OBS / Photoshop; the HALD `.png`
+  works with ffmpeg / G’MIC / ImageMagick.
+- This is the payoff of the whole *identity-at-default* discipline: a neutral
+  grade exports a numerically exact identity LUT (verified: correct S³ entry
+  count, red-fastest ordering, 0→1 endpoints, error within 8-bit quantisation).
+- Title field + a top-bar **Export .cube** button for one-click delivery.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -105,4 +118,4 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 
 ~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · ~~reference look-match~~ ·
 ~~film-stock presets~~ · ~~auto variations~~ · multi-image + motion preview · scopes ·
-~~log/color space~~ · multi-format LUT export · auto cover image · pack workflow.
+~~log/color space~~ · ~~multi-format LUT export~~ · auto cover image · pack workflow.

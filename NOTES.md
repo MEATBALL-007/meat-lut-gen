@@ -57,6 +57,12 @@ Helper ที่มีให้ใช้:
 > ไม่มี ref = identity เป๊ะ** (โค้ด `if(uMatchAmount>0.0)` ข้ามทั้ง block) →
 > ปลอดภัยต่อการ bake LUT.
 
+> **LUT export (Phase 8):** `bakeLUT(S)` render shader เดิม (`uBake=1`) บน
+> identity grid S³ ที่ tile ลงใน FBO (RGBA8) แล้ว `readPixels` → `at(r,g,b)`
+> อ่านค่ากลับ. `lutToCube` เรียง **red เร็วสุด**; `exportHald` ทำ HALD level 8
+> (64³ → 512×512 raster). `setGradeUniforms()` ถูกแยกออกจาก `render()` เพื่อให้
+> bake กับ preview ใช้ค่าตรงกันเป๊ะ. ความละเอียด = 8-bit (เท่า pipeline).
+
 > **Film-stock presets (Phase 5):** **ไม่ใช่ pipeline stage ใหม่** — แต่ละ preset
 > คือชุดค่าของ control ที่มีอยู่แล้ว (`FILM_PRESETS`). กด preset →
 > `effectiveGrade(target, intensity)` blend จาก neutral ไปหา preset แล้ว
@@ -81,7 +87,8 @@ Helper ที่มีให้ใช้:
 - [x] **Phase 5** — Film-stock presets (blendable by Intensity)
 - [x] **Phase 6** — Auto variations (thumbnail deltas on current grade)
 - [x] **Phase 7** — Log / color space (source decode: Rec.709/linear/log)
-- [ ] **Phase 8** — Multi-format LUT export (`.cube`) *(ถัดไป — ของสำคัญ)*
+- [x] **Phase 8** — Multi-format LUT export (`.cube` + HALD `.png`)
+- [ ] Multi-image + motion preview · scopes · auto cover image · pack workflow
 - [ ] **Phase 6** — Auto variations
 - [ ] Multi-image + motion preview · Scopes
 - [ ] **Phase 7** — Log / color space

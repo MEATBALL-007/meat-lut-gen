@@ -311,6 +311,16 @@ input[type=range]::-moz-range-thumb{
 }
 .space-select:focus{ outline:none; border-color:var(--accent); }
 
+/* LUT export */
+.lut-title{
+  width:100%; padding:7px 8px; border-radius:6px; margin:2px 0 2px;
+  background:var(--surface-2); color:var(--text); border:1px solid var(--line);
+  font-family:var(--font-ui); font-size:12px;
+}
+.lut-title:focus{ outline:none; border-color:var(--accent); }
+.export-btns{ display:flex; gap:6px; margin:8px 0 2px; }
+.export-btns .btn{ flex:1; }
+
 .note{
   font-size:11px; color:var(--text-dim); line-height:1.5;
   background:var(--surface-2); border:1px solid var(--line);
@@ -344,6 +354,7 @@ footer .dot{ color:var(--ok); }
   <div class="spacer"></div>
   <button class="btn" id="btnSplit">Split: On</button>
   <button class="btn ghost" id="btnReset">Reset Grade</button>
+  <button class="btn" id="btnExport">Export .cube</button>
   <button class="btn primary" id="btnLoad">Load Image</button>
   <input type="file" id="fileInput" accept="image/*" hidden />
 </header>
@@ -363,10 +374,10 @@ footer .dot{ color:var(--ok); }
   <!-- Controls (sections are generated into here by JS) -->
   <aside class="controls" id="controls">
     <div class="note">
-      <b>Phase 7 — Log / colour space.</b><br>
-      Set how the source is encoded (Rec.709, linear or log) so footage is
-      normalised before grading — then use film looks, curves, variations and
-      the rest. Drag the divider to compare before / after.
+      <b>Phase 8 — Multi-format LUT export.</b><br>
+      Craft a look, then <b>Export .cube</b> (or HALD .png) — the exact preview
+      grade is baked into a 3D LUT for Resolve / Premiere / FCP / OBS. A neutral
+      grade bakes to an exact identity LUT.
     </div>
     <!-- sections injected here -->
   </aside>
@@ -474,6 +485,10 @@ let presetIntensity = 1;
    of the look. 0 Rec.709/sRGB, 1 Linear-sRGB, 2 Linear-2.4, 3 Log (Cineon). */
 let colorSpace = 0;
 let srcImage = null;    // last uploaded image/canvas, for re-statting on changes
+
+/* LUT export settings (Phase 8). */
+let exportTitle = 'MEAT LUT';
+let exportSize  = 33;
 
 /* --------------------------------------------------------------------------
    2. COLOR HELPERS (JS side)
@@ -814,7 +829,23 @@ vec3 applyGrade(vec3 c){
   return c;
 }
 
+/* LUT bake: when uBake is on, the input colour comes from this fragment's
+   position in an identity LUT grid (S^3 entries tiled uTilesPerRow across) so
+   the SAME applyGrade chain produces an exact .cube / HALD export. */
+uniform bool  uBake;
+uniform float uLutSize, uTilesPerRow;
+
 void main(){
+  if(uBake){
+    float S = uLutSize, cols = uTilesPerRow;
+    vec2 p = floor(gl_FragCoord.xy);
+    float tileCol = floor(p.x / S), tileRow = floor(p.y / S);
+    float r = p.x - tileCol*S, g = p.y - tileRow*S;
+    float b = tileRow*cols + tileCol;
+    vec3 inp = vec3(r, g, b) / (S - 1.0);
+    fragColor = vec4(clamp(applyGrade(inp), 0.0, 1.0), 1.0);
+    return;
+  }
   vec3 orig   = texture(uImage, vUv).rgb;
   vec3 graded = applyGrade(orig);
 
@@ -853,7 +884,8 @@ function buildProgram(){
     'uHslHue[0]','uHslSat[0]','uHslLum[0]',
     'uSplitShadowHue','uSplitShadowSat','uSplitHighHue','uSplitHighSat',
     'uSplitBalance','uFade','uFadeRolloff',
-    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uColorSpace'];
+    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uColorSpace',
+    'uBake','uLutSize','uTilesPerRow'];
   names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
 }
 
@@ -926,19 +958,9 @@ function uploadImage(src){
 /* --------------------------------------------------------------------------
    4. RENDER — push state to the shader and draw.
    -------------------------------------------------------------------------- */
-function render(){
-  if(!program) return;
-  gl.useProgram(program);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.uniform1i(uniforms['uImage'], 0);
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, curveTex);
-  gl.uniform1i(uniforms['uCurveLUT'], 1);
-
-  gl.uniform1f(uniforms['uSplit'], splitPos);
-  gl.uniform1i(uniforms['uShowSplit'], splitOn ? 1 : 0);
-
+// Push the whole grade (and colour space) to the shader. Shared by the live
+// preview and the LUT bake, so an exported .cube matches the preview exactly.
+function setGradeUniforms(){
   gl.uniform1f(uniforms['uTemp'], grade.temp);
   gl.uniform1f(uniforms['uTint'], grade.tint);
   gl.uniform1f(uniforms['uExposure'], grade.exposure);
@@ -975,8 +997,110 @@ function render(){
   gl.uniform3fv(uniforms['uRefStd'],  rs.std);
   gl.uniform1f(uniforms['uMatchAmount'], grade.match.amount);
   gl.uniform1i(uniforms['uColorSpace'], colorSpace);
+}
+function render(){
+  if(!program) return;
+  gl.useProgram(program);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(uniforms['uImage'], 0);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, curveTex);
+  gl.uniform1i(uniforms['uCurveLUT'], 1);
 
+  gl.uniform1f(uniforms['uSplit'], splitPos);
+  gl.uniform1i(uniforms['uShowSplit'], splitOn ? 1 : 0);
+  gl.uniform1i(uniforms['uBake'], 0);
+  setGradeUniforms();
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+/* --------------------------------------------------------------------------
+   LUT BAKE & EXPORT (Phase 8)
+   Render the SAME applyGrade chain over an identity S^3 grid (tiled into a
+   square FBO), read it back, and serialise to .cube / HALD .png. Because every
+   control is identity at its default, a neutral grade exports an identity LUT.
+   -------------------------------------------------------------------------- */
+// Bake an S^3 LUT to an RGBA8 buffer. Layout: S slices (blue) tiled `cols` wide.
+function bakeLUT(S){
+  const cols = Math.ceil(Math.sqrt(S)), rows = Math.ceil(S/cols);
+  const W = S*cols, H = S*rows;
+  const ftex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, ftex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ftex, 0);
+
+  gl.useProgram(program);
+  gl.activeTexture(gl.TEXTURE1);                 // applyGrade samples the curve LUT
+  gl.bindTexture(gl.TEXTURE_2D, curveTex);
+  gl.uniform1i(uniforms['uCurveLUT'], 1);
+  setGradeUniforms();
+  gl.uniform1i(uniforms['uShowSplit'], 0);
+  gl.uniform1i(uniforms['uBake'], 1);
+  gl.uniform1f(uniforms['uLutSize'], S);
+  gl.uniform1f(uniforms['uTilesPerRow'], cols);
+  gl.viewport(0, 0, W, H);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  const buf = new Uint8Array(W*H*4);
+  gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.deleteFramebuffer(fbo); gl.deleteTexture(ftex);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  render();                                      // restore the live preview
+  // value(r,g,b) -> [R,G,B] in 0..1 from the tiled buffer
+  const at = (r,g,b)=>{
+    const tc = b%cols, tr = (b - tc)/cols;
+    const o = (((tr*S + g)*W) + (tc*S + r))*4;
+    return [buf[o]/255, buf[o+1]/255, buf[o+2]/255];
+  };
+  return {S, cols, at};
+}
+// Serialise a baked LUT to Resolve/Premiere-style .cube text (red fastest).
+function lutToCube(lut, title){
+  const {S, at} = lut;
+  let s = `# Created by LUT GEN — MEAT LUT Studio\nTITLE "${title}"\n` +
+          `LUT_3D_SIZE ${S}\nDOMAIN_MIN 0.0 0.0 0.0\nDOMAIN_MAX 1.0 1.0 1.0\n`;
+  const out = [];
+  for(let b=0;b<S;b++) for(let g=0;g<S;g++) for(let r=0;r<S;r++){
+    const c = at(r,g,b);
+    out.push(c[0].toFixed(6)+' '+c[1].toFixed(6)+' '+c[2].toFixed(6));
+  }
+  return s + out.join('\n') + '\n';
+}
+function sanitizeName(t){ return (t||'MEAT_LUT').trim().replace(/[^\w-]+/g,'_') || 'MEAT_LUT'; }
+function downloadBlob(filename, blob){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+function exportCube(size, title){
+  const txt = lutToCube(bakeLUT(size), title || 'MEAT LUT');
+  downloadBlob(sanitizeName(title)+'_'+size+'.cube', new Blob([txt], {type:'text/plain'}));
+}
+// True HALD CLUT .png (level 8 => 64^3 in a 512x512 raster, red fastest).
+function exportHald(title){
+  const S = 64, lut = bakeLUT(S), side = 512;
+  const cv = document.createElement('canvas'); cv.width = side; cv.height = side;
+  const ctx = cv.getContext('2d'); const img = ctx.createImageData(side, side);
+  for(let b=0;b<S;b++) for(let g=0;g<S;g++) for(let r=0;r<S;r++){
+    const i = r + g*S + b*S*S;                   // HALD raster index (top-left)
+    const c = lut.at(r,g,b), o = i*4;
+    img.data[o]   = Math.round(c[0]*255);
+    img.data[o+1] = Math.round(c[1]*255);
+    img.data[o+2] = Math.round(c[2]*255);
+    img.data[o+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  cv.toBlob(b=> downloadBlob(sanitizeName(title)+'_hald.png', b), 'image/png');
 }
 
 /* --------------------------------------------------------------------------
@@ -1565,6 +1689,38 @@ function buildUI(){
   /* --- Auto Variations (Phase 6) --- */
   b = addSection('Variations');
   buildVariationsUI(b);
+
+  /* --- Export LUT (Phase 8) --- */
+  b = addSection('Export LUT', true);
+  const tl = document.createElement('div'); tl.className = 'ctrl';
+  tl.innerHTML = '<div class="row"><label>Title</label></div>';
+  const tIn = document.createElement('input'); tIn.type = 'text';
+  tIn.className = 'lut-title'; tIn.value = exportTitle; tIn.placeholder = 'LUT title';
+  tIn.addEventListener('input', ()=> exportTitle = tIn.value);
+  tl.appendChild(tIn); b.appendChild(tl);
+
+  const sl = document.createElement('div'); sl.className = 'ctrl';
+  sl.innerHTML = '<div class="row"><label>.cube size</label></div>';
+  const sSel = document.createElement('select'); sSel.className = 'space-select';
+  [[17,'17 — fast'],[33,'33 — standard'],[65,'65 — high']].forEach(([v,t])=>{
+    const o = document.createElement('option'); o.value = v; o.textContent = t; sSel.appendChild(o); });
+  sSel.value = String(exportSize);
+  sSel.addEventListener('change', ()=> exportSize = parseInt(sSel.value, 10));
+  sl.appendChild(sSel); b.appendChild(sl);
+
+  const btns = document.createElement('div'); btns.className = 'export-btns';
+  const bCube = document.createElement('button'); bCube.className = 'btn primary';
+  bCube.textContent = 'Export .cube';
+  bCube.addEventListener('click', ()=> exportCube(exportSize, exportTitle));
+  const bHald = document.createElement('button'); bHald.className = 'btn';
+  bHald.textContent = 'HALD .png';
+  bHald.addEventListener('click', ()=> exportHald(exportTitle));
+  btns.appendChild(bCube); btns.appendChild(bHald); b.appendChild(btns);
+
+  const en = document.createElement('div'); en.className = 'curve-hint';
+  en.textContent = 'Bakes the exact preview grade into a 3D LUT. .cube works in '
+    + 'Resolve / Premiere / FCP / OBS; HALD .png works in ffmpeg / G’MIC / ImageMagick.';
+  b.appendChild(en);
 }
 function refreshHsl(){
   hslSliders.hue._refresh();
@@ -1636,6 +1792,10 @@ document.getElementById('btnReset').addEventListener('click', ()=>{
   render(); refreshVariations();
 });
 
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  exportCube(exportSize, exportTitle);
+});
+
 /* --------------------------------------------------------------------------
    9. INIT
    -------------------------------------------------------------------------- */
@@ -1649,7 +1809,7 @@ function init(){
   bakeCurves();                      // identity LUT before first render
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 7';
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 8';
 }
 init();
 </script>
