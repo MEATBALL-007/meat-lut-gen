@@ -99,6 +99,12 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
   count, red-fastest ordering, 0→1 endpoints, error within 8-bit quantisation).
 - Title field + a top-bar **Export .cube** button for one-click delivery.
 
+**Phase 9 — Scopes ✅**
+
+- A live **RGB histogram** of the graded preview, sampled from the WebGL canvas
+  and drawn additively. Decoupled from the input rate (render flags it dirty, a
+  `requestAnimationFrame` loop redraws), so dragging stays smooth.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -117,5 +123,5 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 ## Roadmap
 
 ~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · ~~reference look-match~~ ·
-~~film-stock presets~~ · ~~auto variations~~ · multi-image + motion preview · scopes ·
+~~film-stock presets~~ · ~~auto variations~~ · multi-image + motion preview · ~~scopes~~ ·
 ~~log/color space~~ · ~~multi-format LUT export~~ · auto cover image · pack workflow.

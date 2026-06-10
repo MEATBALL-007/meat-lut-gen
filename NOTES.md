@@ -88,7 +88,8 @@ Helper ที่มีให้ใช้:
 - [x] **Phase 6** — Auto variations (thumbnail deltas on current grade)
 - [x] **Phase 7** — Log / color space (source decode: Rec.709/linear/log)
 - [x] **Phase 8** — Multi-format LUT export (`.cube` + HALD `.png`)
-- [ ] Multi-image + motion preview · scopes · auto cover image · pack workflow
+- [x] **Phase 9** — Scopes (RGB histogram)
+- [ ] Multi-image + motion preview · auto cover image · pack workflow
 - [ ] **Phase 6** — Auto variations
 - [ ] Multi-image + motion preview · Scopes
 - [ ] **Phase 7** — Log / color space
