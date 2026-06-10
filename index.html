@@ -397,7 +397,7 @@ footer .dot{ color:var(--ok); }
   <button class="btn ghost" id="btnReset">Reset Grade</button>
   <button class="btn" id="btnExport">Export .cube</button>
   <button class="btn primary" id="btnLoad">Load Image</button>
-  <input type="file" id="fileInput" accept="image/*" multiple hidden />
+  <input type="file" id="fileInput" accept="image/*,.arw,.cr2,.cr3,.nef,.nrw,.dng,.raf,.orf,.rw2,.pef,.srw,.sr2" multiple hidden />
 </header>
 
 <!-- =========================== MAIN =========================== -->
@@ -1993,18 +1993,79 @@ let activeImageIndex = -1;
 let motionTimer = null;
 const filmstripEl = document.getElementById('filmstrip');
 
-function addImages(fileList){
-  const files = [...fileList].filter(f=> f.type.startsWith('image/'));
-  if(!files.length) return;
-  const firstNew = images.length; let pending = files.length;
-  files.forEach(f=>{
-    const img = new Image();
-    img.onload = ()=>{
-      images.push({img, name:f.name || ('image '+(images.length+1))});
-      if(--pending === 0) setActiveImage(firstNew);
-    };
-    img.src = URL.createObjectURL(f);
-  });
+// ---- File decoding, incl. camera RAW via its embedded JPEG preview ----------
+// Browsers can't decode RAW (ARW/CR2/NEF/DNG…), but RAW files embed a full-size
+// JPEG preview — we pull the largest one out by scanning for JPEG markers.
+const RAW_EXT = /\.(arw|cr2|cr3|nef|nrw|dng|raf|orf|rw2|pef|srw|sr2|raw|3fr|erf|kdc|mos|mef|iiq|x3f)$/i;
+const IMG_EXT = /\.(jpe?g|png|gif|webp|avif|bmp|svg)$/i;
+function setStatus(msg){ document.getElementById('statusText').textContent = msg; }
+function loadImageEl(src){
+  return new Promise((res, rej)=>{ const i = new Image(); i.onload = ()=>res(i); i.onerror = rej; i.src = src; });
+}
+// Walk one JPEG from its SOI to its EOI. APPn segments are length-delimited, so
+// an embedded EXIF thumbnail is skipped; SOS entropy data is scanned to its end.
+function jpegEnd(b, start){
+  let p = start + 2;
+  while(p < b.length - 1){
+    if(b[p] !== 0xFF){ p++; continue; }
+    const m = b[p+1];
+    if(m === 0xFF){ p++; continue; }                      // fill byte
+    if(m === 0xD9) return p + 2;                           // EOI
+    if((m >= 0xD0 && m <= 0xD7) || m === 0x01){ p += 2; continue; }  // RSTn / TEM
+    if(p + 3 >= b.length) break;
+    const len = (b[p+2] << 8) | b[p+3];
+    if(len < 2) break;
+    if(m === 0xDA){                                        // SOS -> scan to next marker
+      p += 2 + len;
+      while(p < b.length - 1){
+        if(b[p] === 0xFF){ const n = b[p+1];
+          if(n !== 0x00 && !(n >= 0xD0 && n <= 0xD7)) break; }
+        p++;
+      }
+      continue;
+    }
+    p += 2 + len;
+  }
+  return Math.min(p, b.length);
+}
+async function extractEmbeddedJpeg(file){
+  const b = new Uint8Array(await file.arrayBuffer());
+  let best = null, bestLen = 0;
+  for(let i = 0; i + 3 < b.length; ){
+    if(b[i] === 0xFF && b[i+1] === 0xD8 && b[i+2] === 0xFF){
+      const e = jpegEnd(b, i);
+      if(e - i > bestLen){ bestLen = e - i; best = [i, e]; }
+      i = e;                                               // jump past this JPEG
+    } else i++;
+  }
+  return (best && bestLen > 2048) ? new Blob([b.subarray(best[0], best[1])], {type:'image/jpeg'}) : null;
+}
+// Any file -> a browser-decodable image Blob (RAW resolves to its preview JPEG).
+async function fileToImageBlob(file){
+  const okType = ['image/jpeg','image/png','image/webp','image/gif','image/avif','image/bmp'];
+  if(okType.includes(file.type) || (IMG_EXT.test(file.name) && !RAW_EXT.test(file.name))) return file;
+  return await extractEmbeddedJpeg(file);                  // RAW / unknown -> preview
+}
+
+async function addImages(fileList){
+  const files = [...fileList];
+  const firstNew = images.length; let added = 0;
+  for(const f of files){
+    if(f.type.startsWith('video/')){
+      setStatus('Video import not supported yet — load a still or a RAW.'); continue; }
+    let blob = null;
+    try { blob = await fileToImageBlob(f); } catch(e){ blob = null; }
+    if(!blob){ setStatus('Cannot open ' + f.name + ' — no embedded preview / unsupported format.'); continue; }
+    const url = URL.createObjectURL(blob);
+    let img = null;
+    try { img = await loadImageEl(url); } catch(e){ img = null; }
+    URL.revokeObjectURL(url);
+    if(!img){ setStatus('Could not decode ' + f.name + '.'); continue; }
+    images.push({img, name: f.name || ('image ' + (images.length+1))});
+    added++;
+  }
+  if(added){ setActiveImage(firstNew);
+    setStatus('Loaded ' + added + ' image' + (added>1 ? 's' : '') + ' — WebGL2 ready'); }
 }
 function setActiveImage(i){
   if(i < 0 || i >= images.length) return;
