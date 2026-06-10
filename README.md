@@ -76,6 +76,16 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
 - Thumbnails are rendered through the real shader (each variant grade), so what
   you preview is exactly what you get.
 
+**Phase 7 — Log / colour space ✅**
+
+- An **Input → Source Space** selector decodes the loaded image into display
+  Rec.709 before grading: **Rec.709/sRGB** (identity, default), **Linear
+  (sRGB)**, **Linear (Gamma 2.4)**, or **Log (Cineon) → Rec.709** for log
+  footage. Applied as the very first pipeline step.
+- The JS look-match statistics use the same decode, so reference-match stays
+  consistent across source spaces. Default Rec.709 keeps the exact identity, and
+  because the decode lives inside the shader it bakes into the exported LUT.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -95,4 +105,4 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 
 ~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · ~~reference look-match~~ ·
 ~~film-stock presets~~ · ~~auto variations~~ · multi-image + motion preview · scopes ·
-log/color space · multi-format LUT export · auto cover image · pack workflow.
+~~log/color space~~ · multi-format LUT export · auto cover image · pack workflow.

@@ -303,6 +303,14 @@ input[type=range]::-moz-range-thumb{
   font-family:var(--font-mono); font-size:9px; color:#fff;
   background:linear-gradient(transparent, rgba(0,0,0,.75)); }
 
+/* Source-space selector */
+.space-select{
+  width:100%; padding:7px 8px; border-radius:6px; margin:2px 0 4px;
+  background:var(--surface-2); color:var(--text);
+  border:1px solid var(--line); font-family:var(--font-ui); font-size:12px; cursor:pointer;
+}
+.space-select:focus{ outline:none; border-color:var(--accent); }
+
 .note{
   font-size:11px; color:var(--text-dim); line-height:1.5;
   background:var(--surface-2); border:1px solid var(--line);
@@ -355,10 +363,10 @@ footer .dot{ color:var(--ok); }
   <!-- Controls (sections are generated into here by JS) -->
   <aside class="controls" id="controls">
     <div class="note">
-      <b>Phase 6 — Auto variations.</b><br>
-      Start from a film look or a reference still, refine with curves / split
-      toning / fade, then browse one-click <b>Variations</b> of your grade.
-      Drag the divider to compare before / after.
+      <b>Phase 7 — Log / colour space.</b><br>
+      Set how the source is encoded (Rec.709, linear or log) so footage is
+      normalised before grading — then use film looks, curves, variations and
+      the rest. Drag the divider to compare before / after.
     </div>
     <!-- sections injected here -->
   </aside>
@@ -462,6 +470,11 @@ let refStats = null;
 let presetTarget = null;
 let presetIntensity = 1;
 
+/* Source colour space (how to interpret the loaded image). UI setting, not part
+   of the look. 0 Rec.709/sRGB, 1 Linear-sRGB, 2 Linear-2.4, 3 Log (Cineon). */
+let colorSpace = 0;
+let srcImage = null;    // last uploaded image/canvas, for re-statting on changes
+
 /* --------------------------------------------------------------------------
    2. COLOR HELPERS (JS side)
       The 3-way wheels are converted to RGB offset vectors here, then sent to
@@ -544,9 +557,19 @@ function drawCover(ctx, img, w, h){
   let dw, dh; if(ir > br){ dh = h; dw = h*ir; } else { dw = w; dh = w/ir; }
   ctx.drawImage(img, (w-dw)/2, (h-dh)/2, dw, dh);
 }
+// JS mirror of the shader's source decode (keeps look-match stats consistent).
+function lin2srgbJS(v){ v = Math.max(0,v); return v <= 0.0031308 ? v*12.92 : 1.055*Math.pow(v,1/2.4)-0.055; }
+function cineon2linJS(v){ return Math.pow(10, (v*1023-685)*0.002/0.6); }
+function decodeSourceJS(r,g,b,mode){
+  const f = mode===1 ? lin2srgbJS
+          : mode===2 ? (v=>Math.pow(Math.max(0,v),1/2.4))
+          : mode===3 ? (v=>lin2srgbJS(cineon2linJS(v)))
+          : (v=>v);
+  return [f(r), f(g), f(b)];
+}
 // Mean & std of an image in Rec.709 YCbCr (Cb/Cr centred at 0), computed on a
-// 128x128 downsample. Used by reference look-match (source & reference).
-function computeStats(img){
+// 128x128 downsample. `mode` decodes the source first (look-match consistency).
+function computeStats(img, mode=0){
   const S = 128;
   const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
   const ctx = cv.getContext('2d');
@@ -554,7 +577,7 @@ function computeStats(img){
   const data = ctx.getImageData(0, 0, S, S).data;
   const sum = [0,0,0], sumSq = [0,0,0]; let n = 0;
   for(let i=0;i<data.length;i+=4){
-    const r = data[i]/255, g = data[i+1]/255, b = data[i+2]/255;
+    const [r,g,b] = decodeSourceJS(data[i]/255, data[i+1]/255, data[i+2]/255, mode);
     const y = 0.2126*r + 0.7152*g + 0.0722*b;
     const v = [y, (b-y)/1.8556, (r-y)/1.5748];
     for(let k=0;k<3;k++){ sum[k]+=v[k]; sumSq[k]+=v[k]*v[k]; }
@@ -615,9 +638,25 @@ uniform float uFade, uFadeRolloff;
 /* Reference look-match (YCbCr mean/std transfer) */
 uniform vec3  uSrcMean, uSrcStd, uRefMean, uRefStd;
 uniform float uMatchAmount;
+/* Source colour space (0 Rec.709/sRGB, 1 Linear-sRGB, 2 Linear-2.4, 3 Log) */
+uniform int   uColorSpace;
 
 const float PI = 3.14159265;
 float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+/* Decode the source into display Rec.709 so the rest of the grade (tuned for
+   display-referred 0..1) behaves. Rec.709 source => identity. */
+vec3 lin2srgb(vec3 c){
+  c = max(c, 0.0);
+  return mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c));
+}
+vec3 cineon2lin(vec3 c){ return pow(vec3(10.0), (c*1023.0 - 685.0) * 0.002/0.6); }
+vec3 decodeSource(vec3 c){
+  if(uColorSpace == 1) return lin2srgb(c);
+  if(uColorSpace == 2) return pow(max(c, 0.0), vec3(1.0/2.4));
+  if(uColorSpace == 3) return lin2srgb(cineon2lin(c));
+  return c;
+}
 
 /* Rec.709 RGB <-> YCbCr (Cb/Cr centred at 0). Used by reference look-match. */
 vec3 rgb2ycc(vec3 c){
@@ -675,6 +714,9 @@ vec4 lutAt(float x){
    an identity LUT grid to bake the .cube export.
    ===================================================================== */
 vec3 applyGrade(vec3 c){
+
+  /* -1. Source decode: bring linear/log footage into display Rec.709 ---- */
+  c = decodeSource(c);
 
   /* 0. Reference look-match ------------------------------------------ */
   // Reinhard-style statistical transfer in YCbCr: shift/scale each channel so
@@ -811,7 +853,7 @@ function buildProgram(){
     'uHslHue[0]','uHslSat[0]','uHslLum[0]',
     'uSplitShadowHue','uSplitShadowSat','uSplitHighHue','uSplitHighSat',
     'uSplitBalance','uFade','uFadeRolloff',
-    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount'];
+    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uColorSpace'];
   names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
 }
 
@@ -875,7 +917,8 @@ function uploadImage(src){
   canvas.width = imgW; canvas.height = imgH;
   gl.viewport(0,0,imgW,imgH);
   document.getElementById('resText').textContent = imgW + ' × ' + imgH;
-  srcStats = computeStats(src);          // for reference look-match
+  srcImage = src;
+  srcStats = computeStats(src, colorSpace); // for reference look-match
   render();
   refreshVariations();                   // regenerate variation thumbnails
 }
@@ -931,6 +974,7 @@ function render(){
   gl.uniform3fv(uniforms['uRefMean'], rs.mean);
   gl.uniform3fv(uniforms['uRefStd'],  rs.std);
   gl.uniform1f(uniforms['uMatchAmount'], grade.match.amount);
+  gl.uniform1i(uniforms['uColorSpace'], colorSpace);
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
@@ -1216,7 +1260,7 @@ function buildMatchUI(parent){
     if(!file) return;
     const img = new Image();
     img.onload = ()=>{
-      refStats = computeStats(img);
+      refStats = computeStats(img, 0);   // reference is a display still
       showThumb(img);
       if(grade.match.amount === 0){ grade.match.amount = 1; amt._refresh(); } // auto-apply
       render();
@@ -1408,6 +1452,23 @@ function buildUI(){
   b = addSection('Reference Match', false);
   buildMatchUI(b);
 
+  /* --- Input / Source Space (Phase 7) --- */
+  b = addSection('Input — Source Space');
+  const spaceSel = document.createElement('select'); spaceSel.className = 'space-select';
+  ['Rec.709 / sRGB (display)','Linear (sRGB)','Linear (Gamma 2.4)','Log (Cineon) → Rec.709']
+    .forEach((name,i)=>{ const o = document.createElement('option');
+      o.value = i; o.textContent = name; spaceSel.appendChild(o); });
+  spaceSel.value = colorSpace;
+  spaceSel.addEventListener('change', ()=>{
+    colorSpace = parseInt(spaceSel.value, 10);
+    if(srcImage) srcStats = computeStats(srcImage, colorSpace);
+    render(); refreshVariations();
+  });
+  b.appendChild(spaceSel);
+  const snote = document.createElement('div'); snote.className = 'curve-hint';
+  snote.textContent = 'How to interpret the loaded image — decode linear or log footage into Rec.709 before grading.';
+  b.appendChild(snote);
+
   /* --- White Balance --- */
   b = addSection('White Balance', true);
   sliderRefs.push(addSlider(b,{label:'Temperature',min:-1,max:1,step:0.01,
@@ -1588,7 +1649,7 @@ function init(){
   bakeCurves();                      // identity LUT before first render
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 6';
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 7';
 }
 init();
 </script>

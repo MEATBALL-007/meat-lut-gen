@@ -35,6 +35,7 @@ Helper ที่มีให้ใช้:
 - `addWheel(parent, key, name)` — color wheel 3-way
 
 ## ลำดับ Pipeline ใน `applyGrade` (จุดสำหรับแทรกขั้นตอนใหม่)
+-1. **Source decode** (Phase 7) — `decodeSource` (Rec.709/linear/log → display)
 0. **Reference look-match** (Phase 4) — YCbCr mean/std transfer (มาก่อนทุกอย่าง)
 1. White balance
 2. Exposure
@@ -79,7 +80,8 @@ Helper ที่มีให้ใช้:
 - [x] **Phase 4** — Reference look-match (YCbCr mean/std transfer)
 - [x] **Phase 5** — Film-stock presets (blendable by Intensity)
 - [x] **Phase 6** — Auto variations (thumbnail deltas on current grade)
-- [ ] **Phase 7** — Log / color space *(ถัดไป)*
+- [x] **Phase 7** — Log / color space (source decode: Rec.709/linear/log)
+- [ ] **Phase 8** — Multi-format LUT export (`.cube`) *(ถัดไป — ของสำคัญ)*
 - [ ] **Phase 6** — Auto variations
 - [ ] Multi-image + motion preview · Scopes
 - [ ] **Phase 7** — Log / color space
