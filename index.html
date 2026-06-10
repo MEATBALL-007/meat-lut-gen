@@ -362,6 +362,21 @@ input[type=range]::-moz-range-thumb{
   background:rgba(0,0,0,.6); color:#fff; font-size:10px; line-height:14px; text-align:center;
 }
 
+/* Video playback bar */
+.video-bar{
+  position:absolute; left:50%; transform:translateX(-50%); bottom:14px;
+  display:flex; gap:10px; align-items:center; z-index:6; width:min(560px,86%);
+  padding:8px 12px; background:rgba(20,20,20,.72); backdrop-filter:blur(6px);
+  border:1px solid var(--line); border-radius:10px;
+}
+.video-bar .vbtn{
+  flex:0 0 auto; width:30px; height:30px; border-radius:6px; cursor:pointer;
+  background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-size:12px;
+}
+.video-bar .vbtn:hover{ border-color:var(--accent); }
+.video-bar .vseek{ flex:1; }
+.video-bar .vtime{ flex:0 0 auto; font-family:var(--font-mono); font-size:11px; color:var(--text-dim); }
+
 .note{
   font-size:11px; color:var(--text-dim); line-height:1.5;
   background:var(--surface-2); border:1px solid var(--line);
@@ -397,7 +412,7 @@ footer .dot{ color:var(--ok); }
   <button class="btn ghost" id="btnReset">Reset Grade</button>
   <button class="btn" id="btnExport">Export .cube</button>
   <button class="btn primary" id="btnLoad">Load Image</button>
-  <input type="file" id="fileInput" accept="image/*,.arw,.cr2,.cr3,.nef,.nrw,.dng,.raf,.orf,.rw2,.pef,.srw,.sr2" multiple hidden />
+  <input type="file" id="fileInput" accept="image/*,video/*,.arw,.cr2,.cr3,.nef,.nrw,.dng,.raf,.orf,.rw2,.pef,.srw,.sr2" multiple hidden />
 </header>
 
 <!-- =========================== MAIN =========================== -->
@@ -411,16 +426,21 @@ footer .dot{ color:var(--ok); }
       <div id="splitHandle"><div class="line"></div><div class="grip">◂▸</div></div>
     </div>
     <div class="filmstrip empty" id="filmstrip"></div>
+    <div class="video-bar" id="videoBar" style="display:none">
+      <button class="vbtn" id="vPlay" title="Play / pause">▶</button>
+      <input type="range" class="vseek" id="vSeek" min="0" max="1000" value="0">
+      <span class="vtime" id="vTime">0:00 / 0:00</span>
+    </div>
   </section>
 
   <!-- Controls (sections are generated into here by JS) -->
   <aside class="controls" id="controls">
     <div class="note">
-      <b>MEAT LUT Studio — full pipeline.</b><br>
-      Pick a film look or match a reference, refine with curves / wheels / HSL /
-      split toning, check scopes &amp; variations, then <b>Export .cube</b> /
-      HALD / a cover, or bundle a <b>LUT Pack .zip</b>. Drag the divider to
-      compare before / after.
+      <b>MEAT LUT Studio.</b><br>
+      Load stills, <b>RAW</b> (ARW/CR2/NEF…) or <b>video</b> footage — pick a film
+      look or match a reference, refine with curves / wheels / HSL / split toning,
+      check scopes, then <b>Export .cube</b> / HALD / a cover, or a
+      <b>LUT Pack .zip</b>. Drag the divider to compare before / after.
     </div>
     <!-- sections injected here -->
   </aside>
@@ -1014,6 +1034,7 @@ function bakeCurves(){
     gl.RGBA, gl.UNSIGNED_BYTE, curveData);
 }
 function uploadImage(src){
+  if(typeof clearVideo === 'function') clearVideo();   // leaving video mode for a still
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);  // images are top-down
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -1181,7 +1202,8 @@ function exportHald(title){
    AUTO COVER IMAGE (Phase 11) — a branded before/after still for selling.
    -------------------------------------------------------------------------- */
 function buildCoverCanvas(){
-  const src = activeImageIndex >= 0 ? images[activeImageIndex].img : srcImage;
+  const src = currentVideo ? currentVideo
+            : (activeImageIndex >= 0 ? images[activeImageIndex].img : srcImage);
   const W = 1600, H = 900;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const x = cv.getContext('2d');
@@ -2095,10 +2117,10 @@ async function fileToImageBlob(file){
 
 async function addImages(fileList){
   const files = [...fileList];
+  const vid = files.find(f=> f.type.startsWith('video/') || /\.(mp4|webm|mov|m4v|ogv|ogg|mkv)$/i.test(f.name));
+  if(vid){ loadVideo(vid); return; }            // a video takes over the preview
   const firstNew = images.length; let added = 0;
   for(const f of files){
-    if(f.type.startsWith('video/')){
-      setStatus('Video import not supported yet — load a still or a RAW.'); continue; }
     let blob = null;
     try { blob = await fileToImageBlob(f); } catch(e){ blob = null; }
     if(!blob){ setStatus('Cannot open ' + f.name + ' — no embedded preview / unsupported format.'); continue; }
@@ -2151,6 +2173,69 @@ function renderFilmstrip(){
     filmstripEl.appendChild(t);
   });
 }
+
+/* ---- Video footage (browser-native codecs: MP4/H.264, WebM, MOV, Ogg) ------
+   The current frame becomes the live source texture; grading, scopes, export
+   all work on it. Exotic codecs (ProRes/RAW/MXF) can't decode in-browser. */
+let currentVideo = null;
+const videoBar = document.getElementById('videoBar');
+const vPlay = document.getElementById('vPlay');
+const vSeek = document.getElementById('vSeek');
+const vTime = document.getElementById('vTime');
+function fmtTime(s){ s = Math.max(0, Math.floor(s||0)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function uploadVideoFrame(){
+  if(!currentVideo || currentVideo.readyState < 2) return;
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, currentVideo);
+  render();
+}
+function videoTick(){
+  if(!currentVideo) return;                       // self-stops when cleared
+  if(!currentVideo.paused && !currentVideo.ended){
+    uploadVideoFrame();
+    if(currentVideo.duration) vSeek.value = (currentVideo.currentTime/currentVideo.duration)*1000;
+    vTime.textContent = fmtTime(currentVideo.currentTime)+' / '+fmtTime(currentVideo.duration);
+  }
+  requestAnimationFrame(videoTick);
+}
+function clearVideoEl(){
+  if(currentVideo){ currentVideo.pause(); try{ URL.revokeObjectURL(currentVideo.src); }catch(e){} currentVideo = null; }
+}
+function clearVideo(){ clearVideoEl(); videoBar.style.display = 'none'; }
+function loadVideo(file){
+  const v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.loop = true; v.preload = 'auto';
+  v.addEventListener('error', ()=> setStatus('Cannot decode this video in-browser — try MP4/H.264, WebM or MOV/H.264.'), {once:true});
+  v.addEventListener('loadeddata', ()=> setVideoSource(v, file.name), {once:true});
+  v.src = URL.createObjectURL(file);
+}
+function setVideoSource(v, name){
+  stopMotion(); clearVideoEl();
+  currentVideo = v; activeImageIndex = -1; srcImage = v;
+  filmstripEl.classList.add('empty');             // hide stills strip while video active
+  canvas.width = v.videoWidth; canvas.height = v.videoHeight;
+  gl.viewport(0,0,canvas.width, canvas.height);
+  document.getElementById('resText').textContent = v.videoWidth+' × '+v.videoHeight;
+  videoBar.style.display = 'flex'; vPlay.textContent = '▶';
+  vTime.textContent = '0:00 / '+fmtTime(v.duration);
+  uploadVideoFrame();
+  srcStats = computeStats(v, colorSpace);
+  if(refStats && matchBase){ applyMatch(); } else { render(); refreshVariations(); }
+  v.addEventListener('seeked', ()=>{ uploadVideoFrame(); srcStats = computeStats(v, colorSpace);
+    if(refStats && matchBase) applyMatch(); });
+  setStatus('Video loaded — ' + v.videoWidth + '×' + v.videoHeight);
+  videoTick();
+}
+vPlay.addEventListener('click', ()=>{
+  if(!currentVideo) return;
+  if(currentVideo.paused){ currentVideo.play(); vPlay.textContent = '❚❚'; }
+  else { currentVideo.pause(); vPlay.textContent = '▶'; }
+});
+vSeek.addEventListener('input', ()=>{
+  if(currentVideo && currentVideo.duration) currentVideo.currentTime = (vSeek.value/1000)*currentVideo.duration;
+});
 
 const fileInput = document.getElementById('fileInput');
 document.getElementById('btnLoad').addEventListener('click',()=> fileInput.click());

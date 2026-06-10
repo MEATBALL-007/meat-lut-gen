@@ -135,9 +135,20 @@ is exact.
 > model for a LUT applied to Rec.709 video. Log decode + linear/working-space
 > options arrive in Phase 7.
 
+## Inputs
+
+- **Stills** — JPG/PNG/WebP/GIF/AVIF/BMP.
+- **Camera RAW** — ARW/CR2/CR3/NEF/DNG/RAF/ORF/RW2… via the embedded full-size
+  JPEG preview (pure-JS marker scan, no dependencies, offline).
+- **Video footage** — any codec the browser decodes natively (MP4/H.264, WebM,
+  MOV/H.264, Ogg). The current frame is the live source: play / scrub and grade
+  in real time; export bakes the same grade. Exotic codecs (ProRes/RAW/MXF) must
+  be transcoded first.
+- Load several stills for a filmstrip + motion preview, or drag-and-drop.
+
 ## Usage
 
-Open `index.html` in any WebGL2 browser. Click **Load Image** (or drag an image
+Open `index.html` in any WebGL2 browser. Click **Load Image** (or drag a file
 onto the preview) and start grading. Drag the divider to compare before/after.
 
 ## Roadmap
