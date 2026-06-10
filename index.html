@@ -327,6 +327,31 @@ input[type=range]::-moz-range-thumb{
   border:1px solid var(--line); background:#111; image-rendering:pixelated;
 }
 
+/* Filmstrip (multi-image + motion preview) */
+.filmstrip{
+  position:absolute; left:50%; transform:translateX(-50%); bottom:14px;
+  display:flex; gap:6px; align-items:center; z-index:6; max-width:92%;
+  padding:6px 8px; background:rgba(20,20,20,.72); backdrop-filter:blur(6px);
+  border:1px solid var(--line); border-radius:10px; overflow-x:auto;
+}
+.filmstrip.empty{ display:none; }
+.filmstrip .play{
+  flex:0 0 auto; width:30px; height:30px; border-radius:6px; cursor:pointer;
+  background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+  font-size:12px; display:flex; align-items:center; justify-content:center;
+}
+.filmstrip .play.on{ border-color:var(--accent); color:var(--accent); }
+.film-thumb{
+  position:relative; flex:0 0 auto; width:54px; height:36px; border-radius:5px;
+  overflow:hidden; cursor:pointer; border:2px solid transparent;
+}
+.film-thumb.active{ border-color:var(--accent-2); }
+.film-thumb canvas{ width:100%; height:100%; display:block; }
+.film-thumb .x{
+  position:absolute; top:1px; right:1px; width:14px; height:14px; border-radius:3px;
+  background:rgba(0,0,0,.6); color:#fff; font-size:10px; line-height:14px; text-align:center;
+}
+
 .note{
   font-size:11px; color:var(--text-dim); line-height:1.5;
   background:var(--surface-2); border:1px solid var(--line);
@@ -362,7 +387,7 @@ footer .dot{ color:var(--ok); }
   <button class="btn ghost" id="btnReset">Reset Grade</button>
   <button class="btn" id="btnExport">Export .cube</button>
   <button class="btn primary" id="btnLoad">Load Image</button>
-  <input type="file" id="fileInput" accept="image/*" hidden />
+  <input type="file" id="fileInput" accept="image/*" multiple hidden />
 </header>
 
 <!-- =========================== MAIN =========================== -->
@@ -375,6 +400,7 @@ footer .dot{ color:var(--ok); }
       <div class="split-label" id="afterLabel">AFTER</div>
       <div id="splitHandle"><div class="line"></div><div class="grip">◂▸</div></div>
     </div>
+    <div class="filmstrip empty" id="filmstrip"></div>
   </section>
 
   <!-- Controls (sections are generated into here by JS) -->
@@ -1796,23 +1822,73 @@ handle.addEventListener('pointerup',   ()=> dragSplit=false);
 /* --------------------------------------------------------------------------
    8. TOP-BAR BUTTONS + IMAGE UPLOAD
    -------------------------------------------------------------------------- */
+/* Multi-image set + motion preview (Phase 10). Loaded images live in `images`;
+   the filmstrip switches between them, and motion preview auto-cycles. */
+const images = [];          // { img, name }
+let activeImageIndex = -1;
+let motionTimer = null;
+const filmstripEl = document.getElementById('filmstrip');
+
+function addImages(fileList){
+  const files = [...fileList].filter(f=> f.type.startsWith('image/'));
+  if(!files.length) return;
+  const firstNew = images.length; let pending = files.length;
+  files.forEach(f=>{
+    const img = new Image();
+    img.onload = ()=>{
+      images.push({img, name:f.name || ('image '+(images.length+1))});
+      if(--pending === 0) setActiveImage(firstNew);
+    };
+    img.src = URL.createObjectURL(f);
+  });
+}
+function setActiveImage(i){
+  if(i < 0 || i >= images.length) return;
+  activeImageIndex = i; uploadImage(images[i].img); renderFilmstrip();
+}
+function removeImage(i){
+  images.splice(i, 1);
+  if(images.length === 0){ activeImageIndex = -1; stopMotion();
+    uploadImage(makeDefaultImage()); renderFilmstrip(); return; }
+  setActiveImage(Math.min(activeImageIndex, images.length-1));
+}
+function toggleMotion(){ motionTimer ? stopMotion() : startMotion(); }
+function startMotion(){
+  if(images.length < 2) return;
+  motionTimer = setInterval(()=> setActiveImage((activeImageIndex+1)%images.length), 700);
+  renderFilmstrip();
+}
+function stopMotion(){ if(motionTimer){ clearInterval(motionTimer); motionTimer = null; renderFilmstrip(); } }
+function renderFilmstrip(){
+  filmstripEl.innerHTML = '';
+  filmstripEl.classList.toggle('empty', images.length === 0);
+  if(images.length === 0) return;
+  const play = document.createElement('div');
+  play.className = 'play' + (motionTimer ? ' on' : '');
+  play.textContent = motionTimer ? '❚❚' : '▶'; play.title = 'Motion preview';
+  play.addEventListener('click', toggleMotion);
+  filmstripEl.appendChild(play);
+  images.forEach((im,i)=>{
+    const t = document.createElement('div');
+    t.className = 'film-thumb' + (i === activeImageIndex ? ' active' : '');
+    const c = document.createElement('canvas'); c.width = 54; c.height = 36;
+    drawCover(c.getContext('2d'), im.img, 54, 36); t.appendChild(c);
+    const x = document.createElement('div'); x.className = 'x'; x.textContent = '×';
+    x.addEventListener('click', e=>{ e.stopPropagation(); removeImage(i); });
+    t.appendChild(x);
+    t.addEventListener('click', ()=> setActiveImage(i));
+    filmstripEl.appendChild(t);
+  });
+}
+
 const fileInput = document.getElementById('fileInput');
 document.getElementById('btnLoad').addEventListener('click',()=> fileInput.click());
-fileInput.addEventListener('change', e=>{
-  const f = e.target.files[0]; if(!f) return;
-  const img = new Image();
-  img.onload = ()=>{ uploadImage(img); URL.revokeObjectURL(img.src); };
-  img.src = URL.createObjectURL(f);
-});
-// drag & drop onto the preview
+fileInput.addEventListener('change', e=>{ addImages(e.target.files); fileInput.value = ''; });
+// drag & drop onto the preview (supports multiple files)
 ['dragover','drop'].forEach(ev=>{
   document.getElementById('previewPane').addEventListener(ev, e=>{
     e.preventDefault();
-    if(ev==='drop' && e.dataTransfer.files[0]){
-      const img=new Image();
-      img.onload=()=>{ uploadImage(img); URL.revokeObjectURL(img.src); };
-      img.src=URL.createObjectURL(e.dataTransfer.files[0]);
-    }
+    if(ev === 'drop' && e.dataTransfer.files.length) addImages(e.dataTransfer.files);
   });
 });
 
@@ -1850,7 +1926,7 @@ function init(){
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
   scopesTick();                      // start the scopes refresh loop
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 9';
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 10';
 }
 init();
 </script>

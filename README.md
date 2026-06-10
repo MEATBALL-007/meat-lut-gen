@@ -105,6 +105,13 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
   and drawn additively. Decoupled from the input rate (render flags it dirty, a
   `requestAnimationFrame` loop redraws), so dragging stays smooth.
 
+**Phase 10 — Multi-image + motion preview ✅**
+
+- Load **several stills at once** (multi-select or drop); a **filmstrip** under
+  the preview switches between them so you can check a look across shots.
+- A **motion preview** ▶ button auto-cycles the loaded images, simulating a
+  sequence. Remove images with the × on each thumbnail.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -123,5 +130,5 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 ## Roadmap
 
 ~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · ~~reference look-match~~ ·
-~~film-stock presets~~ · ~~auto variations~~ · multi-image + motion preview · ~~scopes~~ ·
+~~film-stock presets~~ · ~~auto variations~~ · ~~multi-image + motion preview~~ · ~~scopes~~ ·
 ~~log/color space~~ · ~~multi-format LUT export~~ · auto cover image · pack workflow.
