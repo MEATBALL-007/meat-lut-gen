@@ -1137,6 +1137,43 @@ function exportHald(title){
 }
 
 /* --------------------------------------------------------------------------
+   AUTO COVER IMAGE (Phase 11) — a branded before/after still for selling.
+   -------------------------------------------------------------------------- */
+function buildCoverCanvas(){
+  const src = activeImageIndex >= 0 ? images[activeImageIndex].img : srcImage;
+  const W = 1600, H = 900;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const x = cv.getContext('2d');
+  const savedSplit = splitOn; splitOn = false; render();   // full graded frame
+  drawCover(x, canvas, W, H);
+  x.save(); x.beginPath(); x.rect(0,0,W/2,H); x.clip();
+  if(src) drawCover(x, src, W, H);                          // original on the left
+  x.restore();
+  splitOn = savedSplit; render();
+  x.fillStyle = 'rgba(255,255,255,.92)'; x.fillRect(W/2-1, 0, 2, H);  // divider
+  const label = (text, align, fg)=>{
+    x.font = '700 20px "JetBrains Mono", monospace';
+    const w = x.measureText(text).width + 16;
+    const px = align === 'left' ? 24 : W-24-w;
+    x.fillStyle = 'rgba(0,0,0,.5)'; x.fillRect(px, 24, w, 30);
+    x.fillStyle = fg; x.fillText(text, px+8, 45);
+  };
+  label('BEFORE', 'left', '#fff');
+  label('AFTER', 'right', '#FFC72C');
+  const g = x.createLinearGradient(0, H-200, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.82)');
+  x.fillStyle = g; x.fillRect(0, H-200, W, 200);
+  x.fillStyle = '#fff'; x.font = '700 62px "Space Grotesk", system-ui, sans-serif';
+  x.fillText(exportTitle || 'MEAT LUT', 48, H-64);
+  x.fillStyle = '#FFC72C'; x.font = '700 22px "JetBrains Mono", monospace';
+  x.fillText('MEAT LUT · LUT GEN', 50, H-30);
+  return cv;
+}
+function exportCover(){
+  buildCoverCanvas().toBlob(b=> downloadBlob(sanitizeName(exportTitle)+'_cover.png', b), 'image/png');
+}
+
+/* --------------------------------------------------------------------------
    5. DEFAULT TEST IMAGE — so the tool works before any upload.
       A gradient + colour swatches + a skin-tone patch to judge looks.
    -------------------------------------------------------------------------- */
@@ -1781,7 +1818,11 @@ function buildUI(){
   const bHald = document.createElement('button'); bHald.className = 'btn';
   bHald.textContent = 'HALD .png';
   bHald.addEventListener('click', ()=> exportHald(exportTitle));
-  btns.appendChild(bCube); btns.appendChild(bHald); b.appendChild(btns);
+  const bCover = document.createElement('button'); bCover.className = 'btn';
+  bCover.textContent = 'Cover .png';
+  bCover.addEventListener('click', exportCover);
+  btns.appendChild(bCube); btns.appendChild(bHald); btns.appendChild(bCover);
+  b.appendChild(btns);
 
   const en = document.createElement('div'); en.className = 'curve-hint';
   en.textContent = 'Bakes the exact preview grade into a 3D LUT. .cube works in '

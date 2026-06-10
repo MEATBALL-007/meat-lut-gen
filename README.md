@@ -112,6 +112,12 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
 - A **motion preview** ▶ button auto-cycles the loaded images, simulating a
   sequence. Remove images with the × on each thumbnail.
 
+**Phase 11 — Auto cover image ✅**
+
+- One-click **Cover .png** — a branded 1600×900 before/after still (original
+  left, graded right, divider + BEFORE/AFTER labels, LUT title + MEAT LUT mark)
+  for selling the LUT.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -131,4 +137,4 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 
 ~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · ~~reference look-match~~ ·
 ~~film-stock presets~~ · ~~auto variations~~ · ~~multi-image + motion preview~~ · ~~scopes~~ ·
-~~log/color space~~ · ~~multi-format LUT export~~ · auto cover image · pack workflow.
+~~log/color space~~ · ~~multi-format LUT export~~ · ~~auto cover image~~ · pack workflow.

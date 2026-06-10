@@ -90,7 +90,8 @@ Helper ที่มีให้ใช้:
 - [x] **Phase 8** — Multi-format LUT export (`.cube` + HALD `.png`)
 - [x] **Phase 9** — Scopes (RGB histogram)
 - [x] **Phase 10** — Multi-image + motion preview (filmstrip)
-- [ ] Auto cover image · Pack workflow
+- [x] **Phase 11** — Auto cover image (before/after PNG)
+- [ ] Pack workflow
 
 ## Git / Workflow
 - **Dev branch:** `claude/hopeful-pasteur-mbs8qx`
