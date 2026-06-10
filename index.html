@@ -279,6 +279,19 @@ input[type=range]::-moz-range-thumb{
 .match-thumb canvas{ width:100%; height:100%; display:block; }
 .match-row .col{ flex:1; min-width:0; }
 
+/* Film-stock presets */
+.preset-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:4px 0 12px; }
+.preset-chip{
+  text-align:left; padding:8px 10px; border-radius:6px; cursor:pointer;
+  background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+  font-family:var(--font-ui); font-size:12px; font-weight:600; line-height:1.2;
+}
+.preset-chip .stock{ display:block; }
+.preset-chip .kind{ font-family:var(--font-mono); font-size:9px; color:var(--text-dim); }
+.preset-chip:hover{ border-color:var(--accent); }
+.preset-chip.active{ border-color:var(--accent); color:#fff; background:#3a2218; }
+.preset-chip.active .kind{ color:var(--accent-2); }
+
 .note{
   font-size:11px; color:var(--text-dim); line-height:1.5;
   background:var(--surface-2); border:1px solid var(--line);
@@ -331,10 +344,10 @@ footer .dot{ color:var(--ok); }
   <!-- Controls (sections are generated into here by JS) -->
   <aside class="controls" id="controls">
     <div class="note">
-      <b>Phase 4 — Reference look-match.</b><br>
-      Load a reference still and let the grade match its colour automatically
-      (statistical YCbCr transfer), then refine with curves, split toning and
-      the matte fade. Drag the divider to compare before / after.
+      <b>Phase 5 — Film-stock presets.</b><br>
+      Start from a film look (Portra, Velvia, Cinestill, Tri-X…), dial the
+      Intensity, or match a reference still — then refine with curves, split
+      toning and the matte fade. Drag the divider to compare before / after.
     </div>
     <!-- sections injected here -->
   </aside>
@@ -349,7 +362,7 @@ footer .dot{ color:var(--ok); }
 
 <script>
 /* ============================================================================
-   LUT GEN — PHASE 4  (reference look-match on the Phase 1/2/3 engine)
+   LUT GEN — PHASE 5  (film-stock presets on the Phase 1-4 engine)
    ----------------------------------------------------------------------------
    Everything is vanilla JS. The grade is computed entirely in a single WebGL2
    fragment shader so the preview is real-time and — importantly — the SAME math
@@ -368,6 +381,10 @@ footer .dot{ color:var(--ok); }
    affine match  ycc' = (ycc - srcMean) * (refStd/srcStd) + refMean,  blended by
    an Amount. Amount 0 (or no reference) is an exact identity; with fixed stats
    it is a plain RGB->RGB function, so it bakes into the LUT exactly.
+
+   Film-stock presets (Phase 5) are NOT a new shader stage: each preset is just
+   a bundle of values for the existing controls, applied by blending from
+   neutral toward the preset by an Intensity. Nothing new to bake.
 
    COLOR-SCIENCE NOTE (Phase 1 default, easy to revisit):
    We grade directly on the image's stored 0..1 RGB values (display / encoded
@@ -428,6 +445,11 @@ let activeCurve = 'rgb';// which tone curve the editor currently edits
    loaded reference (null until one is loaded). */
 let srcStats = {mean:[0,0,0], std:[1,1,1]};
 let refStats = null;
+
+/* Film-stock preset state. presetTarget is the full preset grade; the live
+   grade is presetTarget blended from neutral by presetIntensity. */
+let presetTarget = null;
+let presetIntensity = 1;
 
 /* --------------------------------------------------------------------------
    2. COLOR HELPERS (JS side)
@@ -1203,14 +1225,122 @@ function buildMatchUI(parent){
   });
 }
 
+/* --------------------------------------------------------------------------
+   FILM-STOCK PRESETS (Phase 5)
+   Each preset is a partial set of values for the existing controls (white
+   balance / tone / wheels / HSL / split / fade / sat). Applying = blend from a
+   neutral default toward the preset by Intensity. HSL band order is
+   [Red, Orange, Yellow, Green, Aqua, Blue, Magenta].
+   -------------------------------------------------------------------------- */
+const FILM_PRESETS = [
+  {name:'Portra 400', kind:'color', set:{
+    temp:0.10, tint:-0.03, contrast:-0.10, highlights:-0.12, shadows:0.10, blacks:0.04,
+    saturation:-0.06, vibrance:0.12,
+    lift:{x:0.10,y:0.18,level:0.04}, gain:{x:0.05,y:0.10},
+    split:{shadowHue:120,shadowSat:0.06,highHue:42,highSat:0.16,balance:0.10} }},
+  {name:'Velvia 50', kind:'color', set:{
+    temp:-0.04, contrast:0.22, highlights:-0.06, shadows:-0.08,
+    saturation:0.30, vibrance:0.20,
+    hsl:{ sat:[0.12,0.0,0.0,0.20,0.10,0.15,0.0] } }},
+  {name:'Cinestill 800T', kind:'tungsten', set:{
+    temp:-0.12, tint:0.04, contrast:0.06,
+    lift:{x:-0.28,y:0.04,level:0.03},
+    split:{shadowHue:195,shadowSat:0.18,highHue:35,highSat:0.10,balance:0.0} }},
+  {name:'Kodachrome 64', kind:'color', set:{
+    temp:0.06, contrast:0.18, shadows:-0.06, blacks:-0.04,
+    saturation:0.08, vibrance:0.10,
+    hsl:{ sat:[0.18,0.06,0.0,0.0,0.0,0.06,0.0], hue:[-0.04,0,0,0,0,0,0] } }},
+  {name:'Fuji Superia', kind:'color', set:{
+    temp:-0.05, tint:-0.06, contrast:0.05, vibrance:0.10,
+    hsl:{ sat:[0,0,0,0.12,0.08,0.05,0], hue:[0,0,0,0.05,0,0,0] } }},
+  {name:'Ektar 100', kind:'color', set:{
+    temp:-0.03, contrast:0.16, blacks:-0.03, saturation:0.18, vibrance:0.12 }},
+  {name:'Polaroid 600', kind:'instant', set:{
+    temp:0.04, contrast:-0.18, saturation:-0.08, fade:0.45, fadeRolloff:0.25,
+    split:{shadowHue:170,shadowSat:0.12,highHue:50,highSat:0.10,balance:0.0} }},
+  {name:'Agfa Vista', kind:'color', set:{
+    temp:0.08, contrast:0.10, saturation:0.16, vibrance:0.10,
+    hsl:{ sat:[0.10,0.10,0.06,0,0,0,0] } }},
+  {name:'Ilford HP5', kind:'b&w', set:{
+    saturation:-1, contrast:0.10, shadows:0.05, highlights:-0.05 }},
+  {name:'Tri-X 400', kind:'b&w', set:{
+    saturation:-1, contrast:0.22, blacks:-0.10, whites:0.06, shadows:-0.05 }},
+];
+
+// Deep-merge a preset's partial `set` onto a base grade (arrays replace).
+function deepAssign(dst, src){
+  for(const k in src){
+    const v = src[k];
+    if(v && typeof v === 'object' && !Array.isArray(v)) deepAssign(dst[k], v);
+    else dst[k] = Array.isArray(v) ? v.slice() : v;
+  }
+}
+function buildPresetGrade(p){ const g = defaultGrade(); deepAssign(g, p.set); return g; }
+
+// Live grade = neutral blended toward the preset target by t (0..1). Tone
+// curves stay identity and reference-match stays off (a clean preset look).
+function effectiveGrade(target, t){
+  const g = defaultGrade();
+  const L = (a,b)=> a + (b-a)*t;          // neutral default for these fields is 0
+  ['temp','tint','exposure','contrast','highlights','shadows','whites','blacks',
+   'saturation','vibrance','fade','fadeRolloff'].forEach(k=> g[k] = L(0, target[k]));
+  ['lift','gamma','gain'].forEach(k=>{
+    g[k] = {x:L(0,target[k].x), y:L(0,target[k].y), level:L(0,target[k].level)};
+  });
+  for(let i=0;i<7;i++){
+    g.hsl.hue[i] = L(0, target.hsl.hue[i]);
+    g.hsl.sat[i] = L(0, target.hsl.sat[i]);
+    g.hsl.lum[i] = L(0, target.hsl.lum[i]);
+  }
+  g.split.shadowHue = target.split.shadowHue;  // hues are fixed; their sat fades in
+  g.split.highHue   = target.split.highHue;
+  g.split.shadowSat = L(0, target.split.shadowSat);
+  g.split.highSat   = L(0, target.split.highSat);
+  g.split.balance   = L(0, target.split.balance);
+  return g;
+}
+
+let resetPresetUI = ()=>{};   // set by buildPresetUI; used by global reset
+function buildPresetUI(parent){
+  const grid = document.createElement('div'); grid.className = 'preset-grid';
+  parent.appendChild(grid);
+  function highlight(name){
+    [...grid.children].forEach(ch=>ch.classList.toggle('active', ch.dataset.name === name));
+  }
+  let intInput;
+  FILM_PRESETS.forEach(p=>{
+    const chip = document.createElement('button'); chip.className = 'preset-chip';
+    chip.dataset.name = p.name;
+    chip.innerHTML = `<span class="stock">${p.name}</span><span class="kind">${p.kind}</span>`;
+    chip.addEventListener('click', ()=>{
+      presetTarget = buildPresetGrade(p); presetIntensity = 1;
+      grade = effectiveGrade(presetTarget, 1);
+      syncUI(); intInput._refresh(); highlight(p.name); render();
+    });
+    grid.appendChild(chip);
+  });
+  intInput = addSlider(parent, {label:'Intensity', min:0, max:1, step:0.01,
+    get:()=>presetIntensity,
+    set:v=>{ presetIntensity = v; if(presetTarget){ grade = effectiveGrade(presetTarget, v); syncUI(); } },
+    fmt:v=>Math.round(v*100)+'%'});
+
+  resetPresetUI = ()=>{
+    presetTarget = null; presetIntensity = 1; highlight(null); intInput._refresh();
+  };
+}
+
 // Keep references so reset + band-switch can refresh the inputs.
 const sliderRefs = [];   // all flat sliders
 const wheelRefs  = [];   // 3-way wheels
 let hslSliders = {};     // {hue, sat, lum} inputs for the active band
 
 function buildUI(){
+  /* --- Film Stock (Phase 5) --- */
+  let b = addSection('Film Stock', true);
+  buildPresetUI(b);
+
   /* --- Reference Match (Phase 4) --- */
-  let b = addSection('Reference Match', true);
+  b = addSection('Reference Match', false);
   buildMatchUI(b);
 
   /* --- White Balance --- */
@@ -1311,6 +1441,13 @@ function refreshHsl(){
   hslSliders.sat._refresh();
   hslSliders.lum._refresh();
 }
+// Push the whole grade object back into every control (after reset / preset).
+function syncUI(){
+  sliderRefs.forEach(s=>s._refresh());
+  wheelRefs.forEach(w=>w._replace());
+  refreshHsl();
+  bakeCurves(); redrawCurveEditor();
+}
 
 /* --------------------------------------------------------------------------
    7. SPLIT SLIDER (drag the divider)
@@ -1364,11 +1501,8 @@ document.getElementById('btnSplit').addEventListener('click', e=>{
 
 document.getElementById('btnReset').addEventListener('click', ()=>{
   grade = defaultGrade();
-  // refresh every input from the fresh state
-  sliderRefs.forEach(s=>s._refresh());
-  wheelRefs.forEach(w=>w._replace());
-  refreshHsl();
-  bakeCurves(); redrawCurveEditor();   // reset the tone curves too
+  resetPresetUI();      // clear active film-stock selection
+  syncUI();             // refresh every input (sliders, wheels, HSL, curves)
   render();
 });
 
@@ -1385,7 +1519,7 @@ function init(){
   bakeCurves();                      // identity LUT before first render
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 4';
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 5';
 }
 init();
 </script>

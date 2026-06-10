@@ -56,6 +56,14 @@ Helper ที่มีให้ใช้:
 > ไม่มี ref = identity เป๊ะ** (โค้ด `if(uMatchAmount>0.0)` ข้ามทั้ง block) →
 > ปลอดภัยต่อการ bake LUT.
 
+> **Film-stock presets (Phase 5):** **ไม่ใช่ pipeline stage ใหม่** — แต่ละ preset
+> คือชุดค่าของ control ที่มีอยู่แล้ว (`FILM_PRESETS`). กด preset →
+> `effectiveGrade(target, intensity)` blend จาก neutral ไปหา preset แล้ว
+> `syncUI()` ดันค่ากลับเข้า control ทุกตัว (sliders/wheels/HSL/curves). Intensity
+> slider เรียก effectiveGrade ใหม่. `syncUI()` ใช้ร่วมกับปุ่ม Reset ด้วย.
+> การเพิ่ม preset ใหม่: เพิ่ม object ใน `FILM_PRESETS` (`set` เป็น partial ของ
+> grade, HSL band order = Red,Orange,Yellow,Green,Aqua,Blue,Magenta).
+
 > **Tone curve (Phase 3):** baked into a 256×1 RGBA 1D-LUT texture บน **texture
 > unit 1** (`uCurveLUT`) ทุกครั้งที่จุดขยับ — shader แค่ sample (R/G/B ใน `.rgb`,
 > master ใน `.a`). ใช้ monotone-cubic spline (`makeSpline`) + half-texel
@@ -69,7 +77,8 @@ Helper ที่มีให้ใช้:
 - [x] **Phase 2** — Split toning + Faded black
 - [x] **Phase 3** — Tone curve (RGB + R/G/B, baked 1D-LUT)
 - [x] **Phase 4** — Reference look-match (YCbCr mean/std transfer)
-- [ ] **Phase 5** — Film-stock presets *(ถัดไป)*
+- [x] **Phase 5** — Film-stock presets (blendable by Intensity)
+- [ ] **Phase 6** — Auto variations *(ถัดไป)*
 - [ ] **Phase 6** — Auto variations
 - [ ] Multi-image + motion preview · Scopes
 - [ ] **Phase 7** — Log / color space

@@ -56,6 +56,17 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
   top. **Amount 0 (or no reference) is an exact identity**; with fixed stats the
   transfer is a plain RGB→RGB function, so it bakes into the LUT exactly.
 
+**Phase 5 — Film-stock presets ✅**
+
+- One-click **film looks** — Portra 400, Velvia 50, Cinestill 800T, Kodachrome
+  64, Fuji Superia, Ektar 100, Polaroid 600, Agfa Vista, plus B&W (Ilford HP5,
+  Tri-X 400) — each a curated bundle of values for the **existing** controls.
+- An **Intensity** slider blends every preset from neutral (0%) to full (100%),
+  so each look is dialable. Presets are *not* a new shader stage — they just
+  populate bake-safe controls, so there's nothing extra to bake.
+- After a preset you can keep refining with any control (curves, split toning,
+  reference match…); **Reset Grade** clears the selection back to neutral.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -74,5 +85,5 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 ## Roadmap
 
 ~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · ~~reference look-match~~ ·
-film-stock presets · auto variations · multi-image + motion preview · scopes ·
+~~film-stock presets~~ · auto variations · multi-image + motion preview · scopes ·
 log/color space · multi-format LUT export · auto cover image · pack workflow.
