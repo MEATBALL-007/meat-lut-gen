@@ -91,7 +91,9 @@ Helper ที่มีให้ใช้:
 - [x] **Phase 9** — Scopes (RGB histogram)
 - [x] **Phase 10** — Multi-image + motion preview (filmstrip)
 - [x] **Phase 11** — Auto cover image (before/after PNG)
-- [ ] Pack workflow
+- [x] **Phase 12** — Pack workflow (multi-LUT .zip)
+
+**🎉 All roadmap phases complete.**
 
 ## Git / Workflow
 - **Dev branch:** `claude/hopeful-pasteur-mbs8qx`
