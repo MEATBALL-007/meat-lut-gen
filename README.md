@@ -67,6 +67,15 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
 - After a preset you can keep refining with any control (curves, split toning,
   reference match…); **Reset Grade** clears the selection back to neutral.
 
+**Phase 6 — Auto variations ✅**
+
+- A **Variations** grid renders live thumbnails of one-click deltas on top of
+  your *current* grade — Warmer / Cooler / Brighter / Punchy / Soft / Moody /
+  Teal-Orange / Faded / Greener. Click one to commit that move and the grid
+  re-rolls from the new base.
+- Thumbnails are rendered through the real shader (each variant grade), so what
+  you preview is exactly what you get.
+
 The grade math is written so the **exact same shader pipeline** can later be
 re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
 neutral grade is verified to be a numerical identity, so the future round-trip
@@ -85,5 +94,5 @@ onto the preview) and start grading. Drag the divider to compare before/after.
 ## Roadmap
 
 ~~Split toning~~ · ~~faded black~~ · ~~curve editor~~ · ~~reference look-match~~ ·
-~~film-stock presets~~ · auto variations · multi-image + motion preview · scopes ·
+~~film-stock presets~~ · ~~auto variations~~ · multi-image + motion preview · scopes ·
 log/color space · multi-format LUT export · auto cover image · pack workflow.

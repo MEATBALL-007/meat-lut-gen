@@ -78,7 +78,8 @@ Helper ที่มีให้ใช้:
 - [x] **Phase 3** — Tone curve (RGB + R/G/B, baked 1D-LUT)
 - [x] **Phase 4** — Reference look-match (YCbCr mean/std transfer)
 - [x] **Phase 5** — Film-stock presets (blendable by Intensity)
-- [ ] **Phase 6** — Auto variations *(ถัดไป)*
+- [x] **Phase 6** — Auto variations (thumbnail deltas on current grade)
+- [ ] **Phase 7** — Log / color space *(ถัดไป)*
 - [ ] **Phase 6** — Auto variations
 - [ ] Multi-image + motion preview · Scopes
 - [ ] **Phase 7** — Log / color space

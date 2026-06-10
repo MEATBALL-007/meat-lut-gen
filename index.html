@@ -292,6 +292,17 @@ input[type=range]::-moz-range-thumb{
 .preset-chip.active{ border-color:var(--accent); color:#fff; background:#3a2218; }
 .preset-chip.active .kind{ color:var(--accent-2); }
 
+/* Auto variations */
+.var-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin:4px 0 10px; }
+.var-cell{ cursor:pointer; border-radius:6px; overflow:hidden; border:1px solid var(--line);
+  background:var(--surface-2); position:relative; }
+.var-cell:hover{ border-color:var(--accent); }
+.var-cell canvas{ display:block; width:100%; aspect-ratio:3/2; object-fit:cover; }
+.var-cell .vlabel{
+  position:absolute; left:0; right:0; bottom:0; padding:2px 5px;
+  font-family:var(--font-mono); font-size:9px; color:#fff;
+  background:linear-gradient(transparent, rgba(0,0,0,.75)); }
+
 .note{
   font-size:11px; color:var(--text-dim); line-height:1.5;
   background:var(--surface-2); border:1px solid var(--line);
@@ -344,10 +355,10 @@ footer .dot{ color:var(--ok); }
   <!-- Controls (sections are generated into here by JS) -->
   <aside class="controls" id="controls">
     <div class="note">
-      <b>Phase 5 — Film-stock presets.</b><br>
-      Start from a film look (Portra, Velvia, Cinestill, Tri-X…), dial the
-      Intensity, or match a reference still — then refine with curves, split
-      toning and the matte fade. Drag the divider to compare before / after.
+      <b>Phase 6 — Auto variations.</b><br>
+      Start from a film look or a reference still, refine with curves / split
+      toning / fade, then browse one-click <b>Variations</b> of your grade.
+      Drag the divider to compare before / after.
     </div>
     <!-- sections injected here -->
   </aside>
@@ -866,6 +877,7 @@ function uploadImage(src){
   document.getElementById('resText').textContent = imgW + ' × ' + imgH;
   srcStats = computeStats(src);          // for reference look-match
   render();
+  refreshVariations();                   // regenerate variation thumbnails
 }
 
 /* --------------------------------------------------------------------------
@@ -1315,7 +1327,7 @@ function buildPresetUI(parent){
     chip.addEventListener('click', ()=>{
       presetTarget = buildPresetGrade(p); presetIntensity = 1;
       grade = effectiveGrade(presetTarget, 1);
-      syncUI(); intInput._refresh(); highlight(p.name); render();
+      syncUI(); intInput._refresh(); highlight(p.name); render(); refreshVariations();
     });
     grid.appendChild(chip);
   });
@@ -1326,6 +1338,59 @@ function buildPresetUI(parent){
 
   resetPresetUI = ()=>{
     presetTarget = null; presetIntensity = 1; highlight(null); intInput._refresh();
+  };
+}
+
+/* --------------------------------------------------------------------------
+   AUTO VARIATIONS (Phase 6)
+   Each variation is a small delta applied on top of the CURRENT grade. We
+   render the current image through each variant into a thumbnail; clicking a
+   thumbnail commits that delta to the live grade.
+   -------------------------------------------------------------------------- */
+const VARIATIONS = [
+  {name:'Warmer',  d:g=>{ g.temp+=0.15; }},
+  {name:'Cooler',  d:g=>{ g.temp-=0.15; }},
+  {name:'Brighter',d:g=>{ g.exposure+=0.30; }},
+  {name:'Punchy',  d:g=>{ g.contrast+=0.15; g.vibrance+=0.12; }},
+  {name:'Soft',    d:g=>{ g.contrast-=0.15; g.fade+=0.12; }},
+  {name:'Moody',   d:g=>{ g.exposure-=0.22; g.shadows-=0.10;
+                          g.split.shadowHue=210; g.split.shadowSat+=0.12; }},
+  {name:'Teal/Org',d:g=>{ g.split.shadowHue=195; g.split.shadowSat+=0.14;
+                          g.split.highHue=40; g.split.highSat+=0.14; }},
+  {name:'Faded',   d:g=>{ g.fade+=0.28; g.fadeRolloff+=0.16; g.contrast-=0.08; }},
+  {name:'Greener', d:g=>{ g.tint-=0.14; g.hsl.sat[3]+=0.12; }},
+];
+const cloneGrade = g => JSON.parse(JSON.stringify(g));   // grade is plain data
+
+let refreshVariations = ()=>{};   // set by buildVariationsUI; called on changes
+function buildVariationsUI(parent){
+  const grid = document.createElement('div'); grid.className = 'var-grid';
+  parent.appendChild(grid);
+  const cells = VARIATIONS.map(v=>{
+    const cell = document.createElement('div'); cell.className = 'var-cell';
+    const c = document.createElement('canvas'); c.width = 90; c.height = 60;
+    const label = document.createElement('div'); label.className = 'vlabel';
+    label.textContent = v.name;
+    cell.appendChild(c); cell.appendChild(label); grid.appendChild(cell);
+    cell.addEventListener('click', ()=>{
+      const ng = cloneGrade(grade); v.d(ng); grade = ng;
+      syncUI(); render(); refreshVariations();
+    });
+    return {v, ctx:c.getContext('2d')};
+  });
+
+  // Render every variation thumbnail off the current grade (full, not split).
+  refreshVariations = ()=>{
+    if(!program) return;
+    const savedGrade = grade, savedSplit = splitOn;
+    splitOn = false;
+    for(const cell of cells){
+      grade = cloneGrade(savedGrade); cell.v.d(grade);
+      render();
+      cell.ctx.clearRect(0,0,90,60);
+      drawCover(cell.ctx, canvas, 90, 60);
+    }
+    grade = savedGrade; splitOn = savedSplit; render();
   };
 }
 
@@ -1435,6 +1500,10 @@ function buildUI(){
   sliderRefs.push(addSlider(b,{label:'Highlight Rolloff',min:0,max:1,step:0.01,
     get:()=>grade.fadeRolloff,set:v=>grade.fadeRolloff=v,
     fmt:v=>Math.round(v*100)+'%'}));
+
+  /* --- Auto Variations (Phase 6) --- */
+  b = addSection('Variations');
+  buildVariationsUI(b);
 }
 function refreshHsl(){
   hslSliders.hue._refresh();
@@ -1503,7 +1572,7 @@ document.getElementById('btnReset').addEventListener('click', ()=>{
   grade = defaultGrade();
   resetPresetUI();      // clear active film-stock selection
   syncUI();             // refresh every input (sliders, wheels, HSL, curves)
-  render();
+  render(); refreshVariations();
 });
 
 /* --------------------------------------------------------------------------
@@ -1519,7 +1588,7 @@ function init(){
   bakeCurves();                      // identity LUT before first render
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 5';
+  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 6';
 }
 init();
 </script>
