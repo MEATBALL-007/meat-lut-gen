@@ -645,6 +645,36 @@ function computeStats(img, mode=0){
   const std  = sumSq.map((sq,k)=>Math.sqrt(Math.max(0, sq/n - mean[k]*mean[k])));
   return {mean, std};
 }
+/* Reference look-match expressed through the REAL controls (so the sliders move
+   and stay editable). From the source vs reference YCbCr stats we derive white
+   balance / exposure / contrast / saturation that push the source toward the
+   reference, then blend baseline -> target by Amount. */
+function matchControls(s, r){
+  const cl = (v,a,b)=> Math.max(a, Math.min(b, v));
+  const sY = Math.max(s.mean[0], 0.02), rY = Math.max(r.mean[0], 0.02);
+  const exposure = cl(Math.log2(rY / sY), -3, 3);
+  const contrast = cl(r.std[0] / Math.max(s.std[0], 0.02) - 1, -1, 1);
+  const sC = Math.max((s.std[1] + s.std[2]) / 2, 0.01);
+  const rC = (r.std[1] + r.std[2]) / 2;
+  const saturation = cl(rC / sC - 1, -1, 1);
+  const dCb = r.mean[1] - s.mean[1];          // blue-diff delta
+  const dCr = r.mean[2] - s.mean[2];          // red-diff delta
+  const temp = cl((dCr - dCb) * 3.0, -1, 1);  // warm(+) along R<->B axis
+  const tint = cl((dCr + dCb) * 3.0, -1, 1);  // magenta(+) along (R+B)<->G axis
+  return {temp, tint, exposure, contrast, saturation};
+}
+let matchBase = null;   // grade snapshot of the 5 fields taken before matching
+function applyMatch(){
+  if(!refStats || !matchBase) return;
+  const t = grade.match.amount, m = matchControls(srcStats, refStats);
+  const L = (a,b)=> a + (b-a)*t;              // baseline -> full match by Amount
+  grade.temp       = L(matchBase.temp, m.temp);
+  grade.tint       = L(matchBase.tint, m.tint);
+  grade.exposure   = L(matchBase.exposure, m.exposure);
+  grade.contrast   = L(matchBase.contrast, m.contrast);
+  grade.saturation = L(matchBase.saturation, m.saturation);
+  syncUI(); render(); refreshVariations();
+}
 
 /* --------------------------------------------------------------------------
    3. WEBGL2 SETUP
@@ -994,8 +1024,8 @@ function uploadImage(src){
   document.getElementById('resText').textContent = imgW + ' × ' + imgH;
   srcImage = src;
   srcStats = computeStats(src, colorSpace); // for reference look-match
-  render();
-  refreshVariations();                   // regenerate variation thumbnails
+  if(refStats && matchBase){ applyMatch(); }  // re-match this new source
+  else { render(); refreshVariations(); }
 }
 
 /* --------------------------------------------------------------------------
@@ -1038,7 +1068,7 @@ function setGradeUniforms(){
   gl.uniform3fv(uniforms['uSrcStd'],  srcStats.std);
   gl.uniform3fv(uniforms['uRefMean'], rs.mean);
   gl.uniform3fv(uniforms['uRefStd'],  rs.std);
-  gl.uniform1f(uniforms['uMatchAmount'], grade.match.amount);
+  gl.uniform1f(uniforms['uMatchAmount'], 0);  // match now drives real controls, not this stage
   gl.uniform1i(uniforms['uColorSpace'], colorSpace);
 }
 function render(){
@@ -1554,12 +1584,12 @@ function buildMatchUI(parent){
   parent.appendChild(row);
 
   const amt = addSlider(parent, {label:'Amount', min:0, max:1, step:0.01,
-    get:()=>grade.match.amount, set:v=>grade.match.amount=v,
+    get:()=>grade.match.amount, set:v=>{ grade.match.amount = v; applyMatch(); },
     fmt:v=>Math.round(v*100)+'%'});
   sliderRefs.push(amt);
 
   const hint = document.createElement('div'); hint.className = 'curve-hint';
-  hint.innerHTML = 'Matches the source colour to the reference (mean/std). ';
+  hint.innerHTML = 'Sets white balance / exposure / contrast / saturation to match the reference — the sliders move, so you can fine-tune. ';
   const clear = document.createElement('a'); clear.textContent = 'clear reference';
   hint.appendChild(clear);
   parent.appendChild(hint);
@@ -1573,10 +1603,14 @@ function buildMatchUI(parent){
     if(!file) return;
     const img = new Image();
     img.onload = ()=>{
+      if(!matchBase){                    // capture pre-match grade once
+        matchBase = {temp:grade.temp, tint:grade.tint, exposure:grade.exposure,
+                     contrast:grade.contrast, saturation:grade.saturation};
+      }
       refStats = computeStats(img, 0);   // reference is a display still
       showThumb(img);
       if(grade.match.amount === 0){ grade.match.amount = 1; amt._refresh(); } // auto-apply
-      render();
+      applyMatch();                      // write the match into the controls
       URL.revokeObjectURL(img.src);
     };
     img.src = URL.createObjectURL(file);
@@ -1589,9 +1623,16 @@ function buildMatchUI(parent){
     if(ev === 'drop' && e.dataTransfer.files[0]) loadRef(e.dataTransfer.files[0]);
   }));
   clear.addEventListener('click', ()=>{
-    refStats = null; thumb.innerHTML = 'no ref'; thumb.classList.remove('has-ref');
-    grade.match.amount = 0; amt._refresh(); render();
+    grade.match.amount = 0; applyMatch();   // Amount 0 -> restores the baseline
+    refStats = null; matchBase = null;
+    thumb.innerHTML = 'no ref'; thumb.classList.remove('has-ref');
+    amt._refresh(); render();
   });
+  // Global Reset Grade clears the loaded reference too (state lives here).
+  resetMatchUI = ()=>{
+    refStats = null; matchBase = null;
+    thumb.innerHTML = 'no ref'; thumb.classList.remove('has-ref');
+  };
 }
 
 /* --------------------------------------------------------------------------
@@ -1670,6 +1711,7 @@ function effectiveGrade(target, t){
 }
 
 let resetPresetUI = ()=>{};   // set by buildPresetUI; used by global reset
+let resetMatchUI = ()=>{};    // set by buildMatchUI; clears the reference on reset
 function buildPresetUI(parent){
   const grid = document.createElement('div'); grid.className = 'preset-grid';
   parent.appendChild(grid);
@@ -1804,7 +1846,7 @@ function buildUI(){
   spaceSel.addEventListener('change', ()=>{
     colorSpace = parseInt(spaceSel.value, 10);
     if(srcImage) srcStats = computeStats(srcImage, colorSpace);
-    render(); refreshVariations();
+    if(refStats && matchBase){ applyMatch(); } else { render(); refreshVariations(); }
   });
   b.appendChild(spaceSel);
   const snote = document.createElement('div'); snote.className = 'curve-hint';
@@ -2129,6 +2171,7 @@ document.getElementById('btnSplit').addEventListener('click', e=>{
 document.getElementById('btnReset').addEventListener('click', ()=>{
   grade = defaultGrade();
   resetPresetUI();      // clear active film-stock selection
+  resetMatchUI();       // clear the loaded reference match
   syncUI();             // refresh every input (sliders, wheels, HSL, curves)
   render(); refreshVariations();
 });
