@@ -63,11 +63,14 @@ for(const [name, pat] of [
 
 console.log('4) Pure-logic unit tests');
 {
+  // source-decode region: lin2srgbJS .. srcDecodeJS (profiles + log curves)
+  const sStart = js.indexOf('function lin2srgbJS');
+  const sFn = fn('srcDecodeJS');
+  const srcRegion = js.slice(sStart, js.indexOf(sFn) + sFn.length);
   const api = new Function(
     line(/const clamp01 = [^\n]*;/) + '\n' + fn('makeSpline') + '\n' + fn('matchControls') + '\n' +
-    line(/function lin2srgbJS[^\n]*\n/) + line(/function cineon2linJS[^\n]*\n/) + fn('decodeSourceJS') + '\n' +
-    fn('jpegEnd') + '\n' + fn('extractEmbeddedJpeg') + '\n' +
-    'return {makeSpline, matchControls, decodeSourceJS, jpegEnd, extractEmbeddedJpeg};'
+    srcRegion + '\n' + fn('jpegEnd') + '\n' + fn('extractEmbeddedJpeg') + '\n' +
+    'return {makeSpline, matchControls, srcDecodeJS, SRC_PROFILES, jpegEnd, extractEmbeddedJpeg};'
   )();
 
   // tone-curve spline: diagonal is identity, monotone has no overshoot
@@ -86,8 +89,17 @@ console.log('4) Pure-logic unit tests');
   assert(api.matchControls(src, {mean:[0.45,0.06,-0.05], std:[0.2,0.1,0.1]}).temp < 0, 'cooler ref => temp -');
   assert(api.matchControls(src, {mean:[0.6,0,0], std:[0.2,0.1,0.1]}).exposure > 0, 'brighter ref => exposure +');
 
-  // colour-space decode: Rec.709 (mode 0) is identity
-  assert(api.decodeSourceJS(0.2,0.5,0.8,0).every((v,i)=>Math.abs(v-[0.2,0.5,0.8][i]) < 1e-12), 'decode mode 0 == identity');
+  // source-decode profiles: Rec.709 profile 0 is identity; logs are monotone in-range
+  assert([0,0.2,0.5,0.8,1].every(x=>Math.abs(api.srcDecodeJS(x,0)-x) < 1e-12), 'source profile 0 (Rec.709) == identity');
+  const slog3i = api.SRC_PROFILES.findIndex(p=>p.n.includes('S-Log3'));
+  assert(slog3i > 0, 'S-Log3 profile present');
+  { let mono = true, prev = -1, inRange = true;
+    for(let i=0;i<=64;i++){ const y = api.srcDecodeJS(i/64, slog3i);
+      if(y < prev - 1e-9) mono = false; if(y < -1e-9 || y > 1 + 1e-9) inRange = false; prev = y; }
+    assert(mono && inRange, 'S-Log3 decode is monotone & within [0,1]'); }
+  // 18% mid-grey for S-Log3 (code 420/1023) -> 0.18 linear -> ~0.461 sRGB display
+  assert(Math.abs(api.srcDecodeJS(420/1023, slog3i) - 0.461) < 0.02, 'S-Log3 18% grey lands at Rec.709 mid');
+  assert(api.SRC_PROFILES.length >= 15, `profile count (${api.SRC_PROFILES.length}) covers the camera logs`);
 
   // RAW embedded-JPEG scan: pick the largest preview, skip nested thumbnail
   const jpeg = (n, nested) => { const a=[0xFF,0xD8];

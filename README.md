@@ -78,13 +78,20 @@ grading, no backend — drop `index.html` on GitHub Pages and go.
 
 **Phase 7 — Log / colour space ✅**
 
-- An **Input → Source Space** selector decodes the loaded image into display
-  Rec.709 before grading: **Rec.709/sRGB** (identity, default), **Linear
-  (sRGB)**, **Linear (Gamma 2.4)**, or **Log (Cineon) → Rec.709** for log
-  footage. Applied as the very first pipeline step.
-- The JS look-match statistics use the same decode, so reference-match stays
-  consistent across source spaces. Default Rec.709 keeps the exact identity, and
-  because the decode lives inside the shader it bakes into the exported LUT.
+- An **Input → Source / Camera Log** selector decodes the loaded footage into
+  display Rec.709 before grading, baked into a 1‑D LUT the shader samples.
+  Picking a camera log makes the exported `.cube` a **“[log] → Rec.709”
+  conversion** that you apply to that camera's footage in your NLE.
+- Profiles (grouped by brand): Rec.709/sRGB · Linear (sRGB / 2.4) · Cineon ·
+  **Sony** S‑Log3, S‑Log2 · **Canon** C‑Log3 · **Panasonic** V‑Log, V‑Log L ·
+  **Fujifilm** F‑Log, F‑Log2 · **Nikon** N‑Log · **ARRI** LogC3 (EI800) ·
+  **RED** Log3G10 · **Blackmagic** Film Gen5 · **DJI** D‑Log · **Apple** Log.
+- The log curves are the published 1‑D transfer functions (CI tests check
+  identity + S‑Log3 mid‑grey). **Tonal decode only — no per‑camera gamut
+  matrix**, so fine‑tune saturation, and verify any “(approx)” profile against
+  the maker's official LUT before selling.
+- Rec.709 stays an exact identity, so a neutral grade still bakes to an identity
+  LUT.
 
 **Phase 8 — Multi-format LUT export ✅**
 

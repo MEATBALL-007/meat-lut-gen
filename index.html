@@ -635,15 +635,48 @@ function drawCover(ctx, img, w, h){
   let dw, dh; if(ir > br){ dh = h; dw = h*ir; } else { dw = w; dh = w/ir; }
   ctx.drawImage(img, (w-dw)/2, (h-dh)/2, dw, dh);
 }
-// JS mirror of the shader's source decode (keeps look-match stats consistent).
+// Source-space decode. A profile maps an encoded channel value (0..1) to a
+// Rec.709 DISPLAY value, baked into a 1-D LUT the shader samples. Camera-log
+// profiles decode log->linear (published transfer fns) then linear->sRGB; this
+// is TONAL only (no per-camera gamut matrix), so saturation may need a tweak.
 function lin2srgbJS(v){ v = Math.max(0,v); return v <= 0.0031308 ? v*12.92 : 1.055*Math.pow(v,1/2.4)-0.055; }
 function cineon2linJS(v){ return Math.pow(10, (v*1023-685)*0.002/0.6); }
-function decodeSourceJS(r,g,b,mode){
-  const f = mode===1 ? lin2srgbJS
-          : mode===2 ? (v=>Math.pow(Math.max(0,v),1/2.4))
-          : mode===3 ? (v=>lin2srgbJS(cineon2linJS(v)))
-          : (v=>v);
-  return [f(r), f(g), f(b)];
+// log code value (0..1) -> linear scene
+const _slog3 = v => { const c=v*1023; return c>=171.2102946929 ? Math.pow(10,(c-420)/261.5)*0.19-0.01 : (c-95)*0.01125/(171.2102946929-95); };
+const _slog2 = v => v>=0.030001222851889303 ? 219*(Math.pow(10,(v-0.616596-0.03)/0.432699)-1)/155 : (v-0.030001222851889303)/3.53881278538813;
+const _vlog  = v => v<0.181 ? (v-0.125)/5.6 : Math.pow(10,(v-0.598206)/0.241514)-0.00873;
+const _clog3 = v => v<0.097465473 ? -(Math.pow(10,(0.12783901-v)/0.36726845)-1)/14.98325 : (v<=0.15277891 ? (v-0.12512248)/1.9754798 : (Math.pow(10,(v-0.12240537)/0.36726845)-1)/14.98325);
+const _flog  = v => { const a=0.555556,b=0.009468,c=0.344676,d=0.790453,e=8.735631,f=0.092864; return v<0.100537775223865 ? (v-f)/e : Math.pow(10,(v-d)/c)/a - b/a; };
+const _flog2 = v => { const a=5.555556,b=0.064829,c=0.245281,d=0.384316,e=8.799461,f=0.092864; return v<0.100686685370811 ? (v-f)/e : Math.pow(10,(v-d)/c)/a - b/a; };
+const _nlog  = v => v>0.328 ? Math.exp((v-0.62)/0.119) : Math.pow(v/0.65+0.0075,3);
+const _logc3 = v => v>0.1496582 ? (Math.pow(10,(v-0.385537)/0.2471896)-0.052272)/5.555556 : (v-0.092809)/5.367655;
+const _l3g10 = v => (Math.pow(10,v/0.224282)-1)/155.975327 - 0.01;
+const _bmd5  = v => v<0.130 ? (v-0.0925)/8.283 : Math.pow(10,(v-0.530)/0.0870)*0.005 - 0.0055;
+const _dlog  = v => v<=0.14 ? (v-0.0929)/6.025 : (Math.pow(10,3.89*v-2.27)-0.0108)/0.9892;
+const _apple = v => { const R0=-0.05641088,c=47.28711236,b=0.00964052,g=0.08550479,d=0.69336945,Pt=c*Math.pow(0.01-R0,2); return v>=Pt ? Math.pow(2,(v-d)/g)-b : (v>=0 ? Math.sqrt(v/c)+R0 : R0); };
+const _D = lin2srgbJS;                                   // linear scene -> sRGB display
+const SRC_PROFILES = [
+  {n:'Rec.709 / sRGB (display)',       g:'Standard',   f:v=>v},
+  {n:'Linear (sRGB)',                  g:'Standard',   f:v=>_D(v)},
+  {n:'Linear (Gamma 2.4)',             g:'Standard',   f:v=>Math.pow(Math.max(0,v),1/2.4)},
+  {n:'Cineon Log',                     g:'Standard',   f:v=>_D(cineon2linJS(v))},
+  {n:'Sony S-Log3',                    g:'Sony',       f:v=>_D(_slog3(v))},
+  {n:'Sony S-Log2 (approx)',           g:'Sony',       f:v=>_D(_slog2(v))},
+  {n:'Canon C-Log3 (approx)',          g:'Canon',      f:v=>_D(_clog3(v))},
+  {n:'Panasonic V-Log',                g:'Panasonic',  f:v=>_D(_vlog(v))},
+  {n:'Panasonic V-Log L',              g:'Panasonic',  f:v=>_D(_vlog(v))},
+  {n:'Fujifilm F-Log',                 g:'Fujifilm',   f:v=>_D(_flog(v))},
+  {n:'Fujifilm F-Log2 (approx)',       g:'Fujifilm',   f:v=>_D(_flog2(v))},
+  {n:'Nikon N-Log (approx)',           g:'Nikon',      f:v=>_D(_nlog(v))},
+  {n:'ARRI LogC3 (EI800)',             g:'ARRI',       f:v=>_D(_logc3(v))},
+  {n:'RED Log3G10',                    g:'RED',        f:v=>_D(_l3g10(v))},
+  {n:'Blackmagic Film Gen5 (approx)',  g:'Blackmagic', f:v=>_D(_bmd5(v))},
+  {n:'DJI D-Log (approx)',             g:'DJI',        f:v=>_D(_dlog(v))},
+  {n:'Apple Log (approx)',             g:'Apple',      f:v=>_D(_apple(v))},
+];
+function srcDecodeJS(v, idx){
+  const p = SRC_PROFILES[idx] || SRC_PROFILES[0];
+  return Math.min(1, Math.max(0, p.f(Math.min(1, Math.max(0, v)))));
 }
 // Mean & std of an image in Rec.709 YCbCr (Cb/Cr centred at 0), computed on a
 // 128x128 downsample. `mode` decodes the source first (look-match consistency).
@@ -655,7 +688,7 @@ function computeStats(img, mode=0){
   const data = ctx.getImageData(0, 0, S, S).data;
   const sum = [0,0,0], sumSq = [0,0,0]; let n = 0;
   for(let i=0;i<data.length;i+=4){
-    const [r,g,b] = decodeSourceJS(data[i]/255, data[i+1]/255, data[i+2]/255, mode);
+    const r = srcDecodeJS(data[i]/255, mode), g = srcDecodeJS(data[i+1]/255, mode), b = srcDecodeJS(data[i+2]/255, mode);
     const y = 0.2126*r + 0.7152*g + 0.0722*b;
     const v = [y, (b-y)/1.8556, (r-y)/1.5748];
     for(let k=0;k<3;k++){ sum[k]+=v[k]; sumSq[k]+=v[k]*v[k]; }
@@ -746,25 +779,16 @@ uniform float uFade, uFadeRolloff;
 /* Reference look-match (YCbCr mean/std transfer) */
 uniform vec3  uSrcMean, uSrcStd, uRefMean, uRefStd;
 uniform float uMatchAmount;
-/* Source colour space (0 Rec.709/sRGB, 1 Linear-sRGB, 2 Linear-2.4, 3 Log) */
-uniform int   uColorSpace;
+/* Source-space decode baked to a 256x1 LUT (per channel) by the selected
+   camera-log / colour-space profile. Rec.709 profile => identity LUT. */
+uniform sampler2D uSrcLUT;
 
 const float PI = 3.14159265;
 float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 
-/* Decode the source into display Rec.709 so the rest of the grade (tuned for
-   display-referred 0..1) behaves. Rec.709 source => identity. */
-vec3 lin2srgb(vec3 c){
-  c = max(c, 0.0);
-  return mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c));
-}
-vec3 cineon2lin(vec3 c){ return pow(vec3(10.0), (c*1023.0 - 685.0) * 0.002/0.6); }
-vec3 decodeSource(vec3 c){
-  if(uColorSpace == 1) return lin2srgb(c);
-  if(uColorSpace == 2) return pow(max(c, 0.0), vec3(1.0/2.4));
-  if(uColorSpace == 3) return lin2srgb(cineon2lin(c));
-  return c;
-}
+/* Sample the source-decode LUT per channel (half-texel corrected, like lutAt). */
+float srcAt(float x){ return texture(uSrcLUT, vec2((clamp(x,0.0,1.0)*255.0+0.5)/256.0, 0.5)).r; }
+vec3 decodeSource(vec3 c){ return vec3(srcAt(c.r), srcAt(c.g), srcAt(c.b)); }
 
 /* Rec.709 RGB <-> YCbCr (Cb/Cr centred at 0). Used by reference look-match. */
 vec3 rgb2ycc(vec3 c){
@@ -977,7 +1001,7 @@ function buildProgram(){
     'uHslHue[0]','uHslSat[0]','uHslLum[0]',
     'uSplitShadowHue','uSplitShadowSat','uSplitHighHue','uSplitHighSat',
     'uSplitBalance','uFade','uFadeRolloff',
-    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uColorSpace',
+    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uSrcLUT',
     'uBake','uLutSize','uTilesPerRow'];
   names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
 }
@@ -1032,6 +1056,27 @@ function bakeCurves(){
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, CURVE_N, 1, 0,
     gl.RGBA, gl.UNSIGNED_BYTE, curveData);
+}
+// 256x1 source-decode LUT (texture unit 3), baked from the selected profile.
+let srcTex; const srcData = new Uint8Array(256 * 4);
+function buildSrcTexture(){
+  srcTex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
+function bakeSrcLUT(){
+  for(let i=0;i<256;i++){
+    const q = Math.round(srcDecodeJS(i/255, colorSpace) * 255);
+    srcData[i*4+0] = q; srcData[i*4+1] = q; srcData[i*4+2] = q; srcData[i*4+3] = 255;
+  }
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, srcData);
 }
 function uploadImage(src){
   if(typeof clearVideo === 'function') clearVideo();   // leaving video mode for a still
@@ -1090,7 +1135,6 @@ function setGradeUniforms(){
   gl.uniform3fv(uniforms['uRefMean'], rs.mean);
   gl.uniform3fv(uniforms['uRefStd'],  rs.std);
   gl.uniform1f(uniforms['uMatchAmount'], 0);  // match now drives real controls, not this stage
-  gl.uniform1i(uniforms['uColorSpace'], colorSpace);
 }
 function render(){
   if(!program) return;
@@ -1101,6 +1145,9 @@ function render(){
   gl.activeTexture(gl.TEXTURE1);
   gl.bindTexture(gl.TEXTURE_2D, curveTex);
   gl.uniform1i(uniforms['uCurveLUT'], 1);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  gl.uniform1i(uniforms['uSrcLUT'], 3);
 
   gl.uniform1f(uniforms['uSplit'], splitPos);
   gl.uniform1i(uniforms['uShowSplit'], splitOn ? 1 : 0);
@@ -1136,6 +1183,9 @@ function bakeLUT(S){
   gl.activeTexture(gl.TEXTURE1);                 // applyGrade samples the curve LUT
   gl.bindTexture(gl.TEXTURE_2D, curveTex);
   gl.uniform1i(uniforms['uCurveLUT'], 1);
+  gl.activeTexture(gl.TEXTURE3);                 // ...and the source-decode LUT
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  gl.uniform1i(uniforms['uSrcLUT'], 3);
   setGradeUniforms();
   gl.uniform1i(uniforms['uShowSplit'], 0);
   gl.uniform1i(uniforms['uBake'], 1);
@@ -1287,18 +1337,18 @@ function exportPack(){
                     '.cube size: ' + exportSize, '', 'LUTs:'];
   const files = [];
   for(const look of looks){
-    grade = cloneGrade(look.grade); colorSpace = look.colorSpace; bakeCurves();
+    grade = cloneGrade(look.grade); colorSpace = look.colorSpace; bakeCurves(); bakeSrcLUT();
     const cube = lutToCube(bakeLUT(exportSize), look.name);
     files.push({name:'LUTs/' + sanitizeName(look.name) + '.cube', data:enc.encode(cube)});
     manifest.push('  - ' + sanitizeName(look.name) + '.cube');
   }
   // cover from the first look
   grade = cloneGrade(looks[0].grade); colorSpace = looks[0].colorSpace; exportTitle = looks[0].name;
-  bakeCurves(); render();
+  bakeCurves(); bakeSrcLUT(); render();
   files.push({name:'cover.png', data:dataURLtoBytes(buildCoverCanvas().toDataURL('image/png'))});
   files.push({name:'README.txt', data:enc.encode(manifest.join('\n') + '\n')});
   // restore everything
-  grade = savedGrade; colorSpace = savedCS; exportTitle = savedTitle; bakeCurves(); render();
+  grade = savedGrade; colorSpace = savedCS; exportTitle = savedTitle; bakeCurves(); bakeSrcLUT(); render();
   downloadBlob(sanitizeName(packName) + '.zip', makeZip(files));
 }
 function buildPackUI(parent){
@@ -1862,21 +1912,27 @@ function buildUI(){
   b = addSection('Reference Match', false);
   buildMatchUI(b);
 
-  /* --- Input / Source Space (Phase 7) --- */
-  b = addSection('Input — Source Space');
+  /* --- Input / Source Space + camera log (Phase 7) --- */
+  b = addSection('Input — Source / Camera Log');
   const spaceSel = document.createElement('select'); spaceSel.className = 'space-select';
-  ['Rec.709 / sRGB (display)','Linear (sRGB)','Linear (Gamma 2.4)','Log (Cineon) → Rec.709']
-    .forEach((name,i)=>{ const o = document.createElement('option');
-      o.value = i; o.textContent = name; spaceSel.appendChild(o); });
+  let groupEl = null, lastGroup = null;
+  SRC_PROFILES.forEach((p,i)=>{
+    if(p.g !== lastGroup){ groupEl = document.createElement('optgroup'); groupEl.label = p.g;
+      spaceSel.appendChild(groupEl); lastGroup = p.g; }
+    const o = document.createElement('option'); o.value = i; o.textContent = p.n; groupEl.appendChild(o);
+  });
   spaceSel.value = colorSpace;
   spaceSel.addEventListener('change', ()=>{
     colorSpace = parseInt(spaceSel.value, 10);
+    bakeSrcLUT();                                  // re-bake the source decode
     if(srcImage) srcStats = computeStats(srcImage, colorSpace);
     if(refStats && matchBase){ applyMatch(); } else { render(); refreshVariations(); }
   });
   b.appendChild(spaceSel);
   const snote = document.createElement('div'); snote.className = 'curve-hint';
-  snote.textContent = 'How to interpret the loaded image — decode linear or log footage into Rec.709 before grading.';
+  snote.innerHTML = 'Tells the LUT what your footage is encoded as — picking a camera log makes the exported '
+    + '.cube a <b>“[log] → Rec.709”</b> conversion. Tonal decode only (no gamut matrix), so fine-tune '
+    + 'saturation; “(approx)” curves should be checked against the maker’s LUT before selling.';
   b.appendChild(snote);
 
   /* --- Scopes (Phase 9) --- */
@@ -2282,8 +2338,10 @@ function init(){
   buildQuad();
   buildTexture();
   buildCurveTexture();
+  buildSrcTexture();
   buildUI();
   bakeCurves();                      // identity LUT before first render
+  bakeSrcLUT();                      // identity source-decode before first render
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
   scopesTick();                      // start the scopes refresh loop
