@@ -509,11 +509,12 @@ footer .dot{ color:var(--ok); }
 
   main{ flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .preview-pane{ flex:0 0 auto; height:40vh; padding:10px; }
-  .dock{ width:auto !important; max-width:none; border:none !important;
+  .dock{ width:auto !important; max-width:none; overflow:visible; border:none !important;
     border-top:1px solid var(--line) !important; }
   .dock-resizer{ display:none; }
   .frame-tabs{ flex-wrap:nowrap; overflow-x:auto; }
   .frame-body{ max-height:none; }
+  .tab{ touch-action:auto; }        /* let the tab bar scroll under a finger */
 }
 @media (max-width: 760px) and (orientation:landscape){
   .preview-pane{ height:62vh; }
