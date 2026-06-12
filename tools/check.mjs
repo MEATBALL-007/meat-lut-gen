@@ -100,7 +100,20 @@ console.log('4) Pure-logic unit tests');
     assert(mono && inRange, 'S-Log3 decode is monotone & within [0,1]'); }
   // 18% mid-grey for S-Log3 (code 420/1023) -> 0.18 linear -> ~0.461 sRGB display
   assert(Math.abs(api.srcDecodeJS(420/1023, slog3i) - 0.461) < 0.02, 'S-Log3 18% grey lands at Rec.709 mid');
-  assert(api.SRC_PROFILES.length >= 15, `profile count (${api.SRC_PROFILES.length}) covers the camera logs`);
+  // every non-identity source profile must decode monotone (no bad log constants)
+  for(let i=1;i<api.SRC_PROFILES.length;i++){
+    let mono = true, prev = -1, inRange = true;
+    for(let k=0;k<=64;k++){ const y = api.srcDecodeJS(k/64, i);
+      if(y < prev - 1e-9) mono = false; if(y < -1e-9 || y > 1 + 1e-9) inRange = false; prev = y; }
+    assert(mono && inRange, `profile #${i} (${api.SRC_PROFILES[i].n}) decode monotone & in [0,1]`);
+  }
+  // ARRI LogC4: 18% mid-grey (code ~0.2784) -> 0.18 linear -> ~0.461 sRGB display
+  const logc4i = api.SRC_PROFILES.findIndex(p=>p.n.includes('LogC4'));
+  assert(logc4i > 0, 'LogC4 profile present');
+  assert(Math.abs(api.srcDecodeJS(0.2784, logc4i) - 0.461) < 0.02, 'LogC4 18% grey lands at Rec.709 mid');
+  // Canon C-Log / C-Log2 present alongside C-Log3
+  assert(api.SRC_PROFILES.some(p=>/C-Log2/.test(p.n)) && api.SRC_PROFILES.some(p=>/C-Log$/.test(p.n)), 'Canon C-Log & C-Log2 present');
+  assert(api.SRC_PROFILES.length >= 20, `profile count (${api.SRC_PROFILES.length}) covers the camera logs`);
 
   // RAW embedded-JPEG scan: pick the largest preview, skip nested thumbnail
   const jpeg = (n, nested) => { const a=[0xFF,0xD8];

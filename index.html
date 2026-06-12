@@ -681,12 +681,18 @@ const _vlog  = v => v<0.181 ? (v-0.125)/5.6 : Math.pow(10,(v-0.598206)/0.241514)
 const _clog3 = v => v<0.097465473 ? -(Math.pow(10,(0.12783901-v)/0.36726845)-1)/14.98325 : (v<=0.15277891 ? (v-0.12512248)/1.9754798 : (Math.pow(10,(v-0.12240537)/0.36726845)-1)/14.98325);
 const _flog  = v => { const a=0.555556,b=0.009468,c=0.344676,d=0.790453,e=8.735631,f=0.092864; return v<0.100537775223865 ? (v-f)/e : Math.pow(10,(v-d)/c)/a - b/a; };
 const _flog2 = v => { const a=5.555556,b=0.064829,c=0.245281,d=0.384316,e=8.799461,f=0.092864; return v<0.100686685370811 ? (v-f)/e : Math.pow(10,(v-d)/c)/a - b/a; };
-const _nlog  = v => v>0.328 ? Math.exp((v-0.62)/0.119) : Math.pow(v/0.65+0.0075,3);
+const _nlog  = v => v>=452/1023 ? Math.exp((v*1023-619)/150) : Math.pow(v*1023/650,3) - 0.0075;
 const _logc3 = v => v>0.1496582 ? (Math.pow(10,(v-0.385537)/0.2471896)-0.052272)/5.555556 : (v-0.092809)/5.367655;
 const _l3g10 = v => (Math.pow(10,v/0.224282)-1)/155.975327 - 0.01;
-const _bmd5  = v => v<0.130 ? (v-0.0925)/8.283 : Math.pow(10,(v-0.530)/0.0870)*0.005 - 0.0055;
+const _bmd5  = v => { const A=0.08692876065491224,B=0.005494072432257808,C=0.5300133392291939,D=8.283605932402494,E=0.09246575342465753;
+  return v < D*0.005+E ? (v-E)/D : Math.exp((v-C)/A) - B; };
 const _dlog  = v => v<=0.14 ? (v-0.0929)/6.025 : (Math.pow(10,3.89*v-2.27)-0.0108)/0.9892;
 const _apple = v => { const R0=-0.05641088,c=47.28711236,b=0.00964052,g=0.08550479,d=0.69336945,Pt=c*Math.pow(0.01-R0,2); return v>=Pt ? Math.pow(2,(v-d)/g)-b : (v>=0 ? Math.sqrt(v/c)+R0 : R0); };
+const _slog1 = v => Math.pow(10,(v-0.616596-0.03)/0.432699) - 0.037584;                                   // Sony S-Log (v1)
+const _clog  = v => v<0.0730597 ? -(Math.pow(10,(0.0730597-v)/0.529136)-1)/10.1596 : (Math.pow(10,(v-0.0730597)/0.529136)-1)/10.1596;            // Canon C-Log
+const _clog2 = v => v<0.092864  ? -(Math.pow(10,(0.092864-v)/0.281863093)-1)/87.09937546 : (Math.pow(10,(v-0.092864)/0.281863093)-1)/87.09937546; // Canon C-Log2
+const _logc4 = (()=>{ const a=(262144-16)/117.45, b=928/1023, c=95/1023;                                  // ARRI LogC4 (ALEXA 35)
+  return v => (Math.pow(2, 14*(v-c)/b + 6) - 64) / a; })();
 const _D = lin2srgbJS;                                   // linear scene -> sRGB display
 const SRC_PROFILES = [
   {n:'Rec.709 / sRGB (display)',       g:'Standard',   f:v=>v},
@@ -695,15 +701,20 @@ const SRC_PROFILES = [
   {n:'Cineon Log',                     g:'Standard',   f:v=>_D(cineon2linJS(v))},
   {n:'Sony S-Log3',                    g:'Sony',       f:v=>_D(_slog3(v))},
   {n:'Sony S-Log2 (approx)',           g:'Sony',       f:v=>_D(_slog2(v))},
+  {n:'Sony S-Log (v1)',                g:'Sony',       f:v=>_D(_slog1(v))},
   {n:'Canon C-Log3 (approx)',          g:'Canon',      f:v=>_D(_clog3(v))},
+  {n:'Canon C-Log2',                   g:'Canon',      f:v=>_D(_clog2(v))},
+  {n:'Canon C-Log',                    g:'Canon',      f:v=>_D(_clog(v))},
   {n:'Panasonic V-Log',                g:'Panasonic',  f:v=>_D(_vlog(v))},
   {n:'Panasonic V-Log L',              g:'Panasonic',  f:v=>_D(_vlog(v))},
   {n:'Fujifilm F-Log',                 g:'Fujifilm',   f:v=>_D(_flog(v))},
   {n:'Fujifilm F-Log2 (approx)',       g:'Fujifilm',   f:v=>_D(_flog2(v))},
-  {n:'Nikon N-Log (approx)',           g:'Nikon',      f:v=>_D(_nlog(v))},
+  {n:'Nikon N-Log',                    g:'Nikon',      f:v=>_D(_nlog(v))},
+  {n:'ARRI LogC4 (ALEXA 35)',          g:'ARRI',       f:v=>_D(_logc4(v))},
   {n:'ARRI LogC3 (EI800)',             g:'ARRI',       f:v=>_D(_logc3(v))},
   {n:'RED Log3G10',                    g:'RED',        f:v=>_D(_l3g10(v))},
-  {n:'Blackmagic Film Gen5 (approx)',  g:'Blackmagic', f:v=>_D(_bmd5(v))},
+  {n:'RED REDLogFilm',                 g:'RED',        f:v=>_D(cineon2linJS(v))},
+  {n:'Blackmagic Film Gen5',           g:'Blackmagic', f:v=>_D(_bmd5(v))},
   {n:'DJI D-Log (approx)',             g:'DJI',        f:v=>_D(_dlog(v))},
   {n:'Apple Log (approx)',             g:'Apple',      f:v=>_D(_apple(v))},
 ];
