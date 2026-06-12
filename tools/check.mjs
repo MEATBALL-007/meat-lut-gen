@@ -59,6 +59,7 @@ for(const [name, pat] of [
   ['reference match -> controls','matchControls'], ['curve node delete','contextmenu'],
   ['LUT bake','bakeLUT'], ['.cube export','lutToCube'], ['HALD export','exportHald'],
   ['zip pack','makeZip'], ['cover image','buildCoverCanvas'], ['scopes','scopesDraw'],
+  ['workspace panels','layoutPanels'], ['panel drag','makeDraggable'], ['layout save','saveLayout'],
 ]) assert(js.includes(pat), `${name} (${pat})`);
 
 console.log('4) Pure-logic unit tests');

@@ -53,6 +53,7 @@ header{
   background:var(--surface);
   border-bottom:1px solid var(--line);
   flex:0 0 auto;
+  position:relative; z-index:50;   /* keep the bar + Panels menu above floating panels */
 }
 .brand{ display:flex; align-items:baseline; gap:10px; }
 .brand .mark{
@@ -86,14 +87,13 @@ button.btn.ghost{ background:transparent; }
    -------------------------------------------------------------------------- */
 main{
   flex:1 1 auto;
-  display:grid;
-  grid-template-columns: 1fr 360px;
+  position:relative;
   min-height:0;
 }
 
 /* --- Preview side --- */
 .preview-pane{
-  position:relative;
+  position:absolute; inset:0;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -157,14 +157,51 @@ main{
 }
 
 /* --- Controls side --- */
-.controls{
-  background:var(--surface);
-  border-left:1px solid var(--line);
-  overflow-y:auto;
-  padding:0 0 40px;
+/* Floating workspace panels (Premiere-style: move / resize / dock anywhere) */
+#panels{ position:fixed; inset:54px 0 30px 0; pointer-events:none; z-index:20; }
+.panel{
+  position:absolute; pointer-events:auto; width:340px; max-height:84vh;
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  box-shadow:0 12px 34px rgba(0,0,0,.5);
 }
-.controls::-webkit-scrollbar{ width:10px; }
-.controls::-webkit-scrollbar-thumb{ background:var(--surface-2); border-radius:6px; }
+.panel.collapsed{ height:auto !important; }
+.panel.collapsed .panel-body, .panel.collapsed .panel-resize{ display:none; }
+.panel-head{
+  flex:0 0 auto; display:flex; align-items:center; gap:6px; cursor:move; user-select:none;
+  padding:8px 8px 8px 11px; background:var(--surface-2); border-bottom:1px solid var(--line);
+}
+.panel.collapsed .panel-head{ border-bottom:none; }
+.panel-title{ flex:1; font-weight:600; font-size:12.5px; letter-spacing:.3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.panel-head .pbtn{
+  flex:0 0 auto; width:20px; height:20px; line-height:1; border:none; border-radius:4px;
+  background:none; color:var(--text-dim); cursor:pointer; font-size:13px; font-family:var(--font-mono);
+}
+.panel-head .pbtn:hover{ color:#fff; background:var(--line); }
+.panel-body{ flex:1 1 auto; overflow:auto; padding:4px 14px 14px; }
+.panel-body::-webkit-scrollbar{ width:9px; }
+.panel-body::-webkit-scrollbar-thumb{ background:var(--surface-2); border-radius:6px; }
+.panel-resize{
+  position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize;
+  background:linear-gradient(135deg, transparent 45%, var(--line) 45% 60%, transparent 60%);
+}
+
+/* Top-bar dropdown menu (Panels) */
+.menu{ position:relative; }
+.menu-pop{
+  position:absolute; right:0; top:calc(100% + 7px); min-width:210px; z-index:80; display:none;
+  background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:6px;
+  box-shadow:0 12px 34px rgba(0,0,0,.55); max-height:74vh; overflow:auto;
+}
+.menu.open .menu-pop{ display:block; }
+.menu-pop label{ display:flex; align-items:center; gap:8px; padding:5px 8px; font-size:12px;
+  cursor:pointer; border-radius:5px; }
+.menu-pop label:hover{ background:var(--surface-2); }
+.menu-pop .sep{ height:1px; background:var(--line); margin:6px 4px; }
+.menu-pop .mbtn{ width:100%; text-align:left; background:none; border:none; color:var(--text);
+  padding:7px 8px; font-size:12px; cursor:pointer; border-radius:5px; font-weight:600; }
+.menu-pop .mbtn:hover{ background:var(--surface-2); color:#fff; }
 
 /* Collapsible section */
 details.section{ border-bottom:1px solid var(--line); }
@@ -394,6 +431,7 @@ footer{
   border-top:1px solid var(--line);
   font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
   display:flex; gap:16px; align-items:center;
+  position:relative; z-index:50;
 }
 footer .dot{ color:var(--ok); }
 </style>
@@ -408,6 +446,10 @@ footer .dot{ color:var(--ok); }
     <span class="meat">MEAT&nbsp;LUT</span>
   </div>
   <div class="spacer"></div>
+  <div class="menu" id="panelsMenu">
+    <button class="btn" id="btnPanels">Panels ▾</button>
+    <div class="menu-pop" id="panelsPop"></div>
+  </div>
   <button class="btn" id="btnSplit">Split: On</button>
   <button class="btn ghost" id="btnReset">Reset Grade</button>
   <button class="btn" id="btnExport">Export .cube</button>
@@ -433,17 +475,8 @@ footer .dot{ color:var(--ok); }
     </div>
   </section>
 
-  <!-- Controls (sections are generated into here by JS) -->
-  <aside class="controls" id="controls">
-    <div class="note">
-      <b>MEAT LUT Studio.</b><br>
-      Load stills, <b>RAW</b> (ARW/CR2/NEF…) or <b>video</b> footage — pick a film
-      look or match a reference, refine with curves / wheels / HSL / split toning,
-      check scopes, then <b>Export .cube</b> / HALD / a cover, or a
-      <b>LUT Pack .zip</b>. Drag the divider to compare before / after.
-    </div>
-    <!-- sections injected here -->
-  </aside>
+  <!-- Floating workspace panels are generated into here by JS -->
+  <div id="panels"></div>
 </main>
 
 <footer>
@@ -1428,20 +1461,137 @@ function makeDefaultImage(){
 /* --------------------------------------------------------------------------
    6. CONTROL UI GENERATION
    -------------------------------------------------------------------------- */
-const controlsEl = document.getElementById('controls');
+/* Floating workspace panels. addSection() still returns a body element, so all
+   control-building code is unchanged; panels can be dragged / resized / closed
+   and the layout persists in localStorage (Premiere-style workspace). */
+const panelsEl = document.getElementById('panels');
+const PANELS = [];
+let zTop = 30;
+const LAYOUT_KEY = 'meatlut.layout.v1';
 
-// Generic collapsible section.
+function place(p){
+  p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px'; p.el.style.width = p.w + 'px';
+  if(p.h){ p.el.style.height = p.h + 'px'; p.el.style.maxHeight = 'none'; }
+  else   { p.el.style.height = ''; p.el.style.maxHeight = ''; }
+}
+function setCollapsed(p, v){ p.collapsed = v; p.el.classList.toggle('collapsed', v);
+  p.head.querySelector('.pbtn').textContent = v ? '▸' : '▾'; }
+function setHidden(p, v){ p.hidden = v; p.el.style.display = v ? 'none' : 'flex'; }
+function bringFront(p){ p.z = ++zTop; p.el.style.zIndex = p.z; }
+
+function makeDraggable(p){
+  p.head.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.pbtn')) return;
+    bringFront(p);
+    const host = panelsEl.getBoundingClientRect(), r = p.el.getBoundingClientRect();
+    const ox = e.clientX - r.left, oy = e.clientY - r.top;
+    const mv = ev=>{
+      let nx = ev.clientX - host.left - ox, ny = ev.clientY - host.top - oy;
+      p.x = Math.max(-r.width + 64, Math.min(host.width - 64, nx));
+      p.y = Math.max(0, Math.min(host.height - 28, ny));
+      p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px';
+    };
+    const up = ()=>{ document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); saveLayout(); };
+    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+    e.preventDefault();
+  });
+}
+function makeResizable(p){
+  p.resize.addEventListener('pointerdown', e=>{
+    e.stopPropagation(); bringFront(p);
+    const r = p.el.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, sw = r.width, sh = r.height;
+    const mv = ev=>{
+      p.w = Math.max(220, sw + ev.clientX - sx); p.h = Math.max(90, sh + ev.clientY - sy);
+      p.el.style.width = p.w + 'px'; p.el.style.height = p.h + 'px'; p.el.style.maxHeight = 'none';
+    };
+    const up = ()=>{ document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); saveLayout(); };
+    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+    e.preventDefault();
+  });
+}
 function addSection(title, open=false){
-  const d = document.createElement('details');
-  d.className = 'section';
-  if(open) d.open = true;
-  d.innerHTML = `<summary><span class="chev">▶</span>${title}<span class="tag"></span></summary>`;
-  const body = document.createElement('div');
-  body.className = 'section-body';
-  d.appendChild(body);
-  controlsEl.appendChild(d);
+  const el = document.createElement('div'); el.className = 'panel';
+  const head = document.createElement('div'); head.className = 'panel-head';
+  const t = document.createElement('span'); t.className = 'panel-title'; t.textContent = title;
+  const bCol = document.createElement('button'); bCol.className = 'pbtn'; bCol.title = 'Collapse';
+  const bClose = document.createElement('button'); bClose.className = 'pbtn'; bClose.textContent = '✕'; bClose.title = 'Close';
+  head.append(t, bCol, bClose);
+  const body = document.createElement('div'); body.className = 'panel-body';
+  const resize = document.createElement('div'); resize.className = 'panel-resize';
+  el.append(head, body, resize);
+  panelsEl.appendChild(el);
+
+  const p = { key:title, el, head, body, resize, collapsed:false, hidden:false, x:8, y:8, w:340, h:0, z:0 };
+  PANELS.push(p);
+  setCollapsed(p, !open);
+  el.addEventListener('pointerdown', ()=> bringFront(p), true);
+  bCol.addEventListener('click', e=>{ e.stopPropagation(); setCollapsed(p, !p.collapsed); saveLayout(); });
+  head.addEventListener('dblclick', e=>{ if(!e.target.closest('.pbtn')){ setCollapsed(p, !p.collapsed); saveLayout(); } });
+  bClose.addEventListener('click', e=>{ e.stopPropagation(); setHidden(p, true); saveLayout(); buildPanelsMenu(); });
+  makeDraggable(p); makeResizable(p);
   return body;
 }
+
+function autoTile(){
+  const host = panelsEl.getBoundingClientRect(), H = host.height;
+  let x = Math.max(6, host.width - 352), y = 6;
+  for(const p of PANELS){
+    if(p.hidden) continue;
+    p.w = 340; p.h = 0; place(p);
+    const h = p.el.offsetHeight || 40;
+    if(y + h > H - 6 && y > 6){ x = Math.max(6, x - 352); y = 6; }
+    p.x = x; p.y = y; place(p); bringFront(p);
+    y += h + 8;
+  }
+}
+function saveLayout(){
+  const data = {};
+  for(const p of PANELS) data[p.key] = {x:p.x, y:p.y, w:p.w, h:p.h, collapsed:p.collapsed, hidden:p.hidden, z:p.z||0};
+  try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify(data)); }catch(e){}
+}
+function restoreLayout(){
+  let data = null; try{ data = JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null'); }catch(e){}
+  if(!data) return false;
+  for(const p of PANELS){
+    const s = data[p.key]; if(!s) continue;
+    p.x = s.x; p.y = s.y; p.w = s.w || 340; p.h = s.h || 0;
+    setCollapsed(p, !!s.collapsed); setHidden(p, !!s.hidden);
+    if(s.z){ p.z = s.z; zTop = Math.max(zTop, s.z); p.el.style.zIndex = s.z; }
+    place(p);
+  }
+  return true;
+}
+function resetLayout(){
+  try{ localStorage.removeItem(LAYOUT_KEY); }catch(e){}
+  for(const p of PANELS){ setCollapsed(p, p.collapsed); setHidden(p, false); }
+  autoTile(); saveLayout(); buildPanelsMenu();
+}
+function layoutPanels(){ if(!restoreLayout()) autoTile(); buildPanelsMenu(); }
+
+const panelsPop = document.getElementById('panelsPop');
+const panelsMenu = document.getElementById('panelsMenu');
+function buildPanelsMenu(){
+  panelsPop.innerHTML = '';
+  for(const p of PANELS){
+    const lab = document.createElement('label');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !p.hidden;
+    cb.addEventListener('change', ()=>{ setHidden(p, !cb.checked); if(cb.checked) bringFront(p); saveLayout(); });
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + p.key));
+    panelsPop.appendChild(lab);
+  }
+  const sep = document.createElement('div'); sep.className = 'sep'; panelsPop.appendChild(sep);
+  const reset = document.createElement('button'); reset.className = 'mbtn'; reset.textContent = '↺ Reset layout';
+  reset.addEventListener('click', ()=>{ resetLayout(); panelsMenu.classList.remove('open'); });
+  panelsPop.appendChild(reset);
+}
+document.getElementById('btnPanels').addEventListener('click', e=>{ e.stopPropagation(); panelsMenu.classList.toggle('open'); });
+document.addEventListener('click', e=>{ if(!panelsMenu.contains(e.target)) panelsMenu.classList.remove('open'); });
+window.addEventListener('resize', ()=>{
+  const host = panelsEl.getBoundingClientRect();
+  for(const p of PANELS){ if(p.hidden) continue;
+    p.x = Math.max(-p.w + 64, Math.min(host.width - 64, p.x));
+    p.y = Math.max(0, Math.min(host.height - 28, p.y)); place(p); }
+});
 
 // A labelled slider bound to a getter/setter so it works for nested state too.
 function addSlider(parent, opts){
@@ -2342,6 +2492,7 @@ function init(){
   buildUI();
   bakeCurves();                      // identity LUT before first render
   bakeSrcLUT();                      // identity source-decode before first render
+  layoutPanels();                    // position the floating workspace panels
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
   scopesTick();                      // start the scopes refresh loop

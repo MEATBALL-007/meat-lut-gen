@@ -153,10 +153,18 @@ is exact.
   be transcoded first.
 - Load several stills for a filmstrip + motion preview, or drag-and-drop.
 
+## Workspace
+
+Every control group is a **floating panel** (Premiere-style): drag it by its
+header anywhere, resize from the bottom-right corner, collapse (▾) or close (✕).
+The **Panels** menu in the top bar toggles any panel and has **Reset layout**;
+your arrangement is saved to `localStorage` and restored next time.
+
 ## Usage
 
 Open `index.html` in any WebGL2 browser. Click **Load Image** (or drag a file
 onto the preview) and start grading. Drag the divider to compare before/after.
+Rearrange the workspace panels to taste.
 
 ## Roadmap
 
