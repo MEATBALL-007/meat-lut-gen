@@ -59,6 +59,7 @@ for(const [name, pat] of [
   ['reference match -> controls','matchControls'], ['curve node delete','contextmenu'],
   ['LUT bake','bakeLUT'], ['.cube export','lutToCube'], ['HALD export','exportHald'],
   ['zip pack','makeZip'], ['cover image','buildCoverCanvas'], ['scopes','scopesDraw'],
+  ['waveform','drawWaveform'], ['rgb parade','drawParade'], ['vectorscope','drawVectorscope'],
   ['workspace panels','layoutPanels'], ['panel drag','makeDraggable'], ['layout save','saveLayout'],
   ['drag-drop overlay','dropOverlay'],
   ['undo/redo history','pushHistory'], ['apply snapshot','applyState'],

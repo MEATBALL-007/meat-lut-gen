@@ -2012,25 +2012,99 @@ function buildPresetUI(parent){
    -------------------------------------------------------------------------- */
 let scopesDirty = true, scopesDraw = ()=>{};
 function buildScopesUI(parent){
+  // Mode selector: Histogram / Waveform / RGB Parade / Vectorscope
+  const sel = document.createElement('select'); sel.className = 'space-select';
+  ['Histogram','Waveform (luma)','RGB Parade','Vectorscope'].forEach((n,i)=>{
+    const o = document.createElement('option'); o.value = i; o.textContent = n; sel.appendChild(o); });
+  parent.appendChild(sel);
+
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 120;
   cv.className = 'scope-canvas'; parent.appendChild(cv);
   const ctx = cv.getContext('2d');
-  const tmp = document.createElement('canvas'); tmp.width = 256; tmp.height = 128;
+  // Source pixels: downsample the rendered canvas into a 256x128 buffer.
+  const SW = 256, SH = 128;
+  const tmp = document.createElement('canvas'); tmp.width = SW; tmp.height = SH;
   const tctx = tmp.getContext('2d');
-  scopesDraw = ()=>{
-    if(!canvas.width) return;
-    tctx.clearRect(0,0,256,128); tctx.drawImage(canvas, 0,0,256,128);
-    let data; try{ data = tctx.getImageData(0,0,256,128).data; }catch(e){ return; }
-    const H = new Uint32Array(3*256);
-    for(let i=0;i<data.length;i+=4){ H[data[i]]++; H[256+data[i+1]]++; H[512+data[i+2]]++; }
-    let mx = 1;                                   // ignore 0/255 spikes when scaling
-    for(let ch=0;ch<3;ch++) for(let x=1;x<255;x++){ const v=H[ch*256+x]; if(v>mx) mx=v; }
-    ctx.fillStyle = '#111'; ctx.fillRect(0,0,256,120);
+
+  let mode = 0;
+  const HEIGHTS = [120, 180, 180, 256];
+  sel.addEventListener('change', ()=>{ mode = parseInt(sel.value, 10); cv.height = HEIGHTS[mode]; scopesDirty = true; });
+
+  function clearBG(H, c){ ctx.fillStyle = c || '#111'; ctx.fillRect(0,0,256,H); }
+
+  // y position (top = bright) for a 0..255 value in a scope of height H
+  const yFor = (v,H)=> Math.min(H-1, Math.round((255-v)/255*(H-1)));
+
+  function drawHistogram(data){
+    const H = cv.height, B = new Uint32Array(3*256);
+    for(let i=0;i<data.length;i+=4){ B[data[i]]++; B[256+data[i+1]]++; B[512+data[i+2]]++; }
+    let mx = 1; for(let ch=0;ch<3;ch++) for(let x=1;x<255;x++){ const v=B[ch*256+x]; if(v>mx) mx=v; }
+    clearBG(H);
     ctx.globalCompositeOperation = 'lighter';
     const cols = ['#ff4d4d','#4ed39b','#4d9bff'];
     for(let ch=0;ch<3;ch++){ ctx.fillStyle = cols[ch];
-      for(let x=0;x<256;x++){ const h = Math.min(118, H[ch*256+x]/mx*118); ctx.fillRect(x,120-h,1,h); } }
+      for(let x=0;x<256;x++){ const h = Math.min(H-2, B[ch*256+x]/mx*(H-2)); ctx.fillRect(x,H-h,1,h); } }
     ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // shared: build an intensity image then paint IRE grid lines on top
+  function paintGrid(H){
+    ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1;
+    for(const p of [0,0.25,0.5,0.75,1]){ const y = Math.round(p*(H-1)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(256,y); ctx.stroke(); }
+  }
+
+  function drawWaveform(data){
+    const W = 256, H = cv.height, buf = new Float32Array(W*H);
+    for(let py=0;py<SH;py++) for(let x=0;x<SW;x++){ const i=(py*SW+x)*4;
+      const L = 0.2126*data[i] + 0.7152*data[i+1] + 0.0722*data[i+2];
+      buf[yFor(L,H)*W + x]++; }
+    const img = ctx.createImageData(W,H);
+    for(let k=0;k<W*H;k++){ const v=buf[k], o=k*4; img.data[o+3]=255;
+      if(v>0){ const g=Math.min(255,40+v*55); img.data[o]=g*0.35; img.data[o+1]=g; img.data[o+2]=g*0.45; }
+      else   { img.data[o]=img.data[o+1]=img.data[o+2]=17; } }
+    ctx.putImageData(img,0,0); paintGrid(H);
+  }
+
+  function drawParade(data){
+    const W = 256, H = cv.height, secW = 85;
+    const img = ctx.createImageData(W,H);
+    for(let k=0;k<W*H;k++){ const o=k*4; img.data[o]=img.data[o+1]=img.data[o+2]=17; img.data[o+3]=255; }
+    for(let ch=0;ch<3;ch++){ const xbase = ch*secW, buf = new Float32Array(secW*H);
+      for(let py=0;py<SH;py++) for(let col=0;col<SW;col++){ const c = data[(py*SW+col)*4+ch];
+        const sx = Math.min(secW-1, (col*secW/SW)|0); buf[yFor(c,H)*secW + sx]++; }
+      for(let y=0;y<H;y++) for(let sx=0;sx<secW;sx++){ const v=buf[y*secW+sx]; if(v<=0) continue;
+        const o=(y*W + xbase+sx)*4, inten=Math.min(255,40+v*55); img.data[o+ch]=inten; } }
+    ctx.putImageData(img,0,0); paintGrid(H);
+  }
+
+  function drawVectorscope(data){
+    const W = 256, H = 256, S = 110;     // S = chroma scale (100% bars land near r~90)
+    const img = ctx.createImageData(W,H);
+    for(let k=0;k<W*H;k++){ const o=k*4; img.data[o]=img.data[o+1]=img.data[o+2]=12; img.data[o+3]=255; }
+    for(let p=0;p<data.length;p+=4){ const r=data[p],g=data[p+1],b=data[p+2];
+      const Y=0.299*r+0.587*g+0.114*b, u=(b-Y)/255, v=(r-Y)/255;
+      const x=(128+u*S)|0, y=(128-v*S)|0; if(x<0||x>255||y<0||y>255) continue;
+      const o=(y*256+x)*4; img.data[o+1]=Math.min(255,img.data[o+1]+55);
+      img.data[o]=Math.min(170,img.data[o]+18); img.data[o+2]=Math.min(170,img.data[o+2]+18); }
+    ctx.putImageData(img,0,0);
+    // graticule + colour targets
+    ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(128,128,98,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(128,12); ctx.lineTo(128,244); ctx.moveTo(12,128); ctx.lineTo(244,128); ctx.stroke();
+    ctx.font='9px '+'monospace'; ctx.fillStyle='rgba(255,255,255,.65)';
+    for(const t of [[255,0,0,'R'],[255,255,0,'Yl'],[0,255,0,'G'],[0,255,255,'Cy'],[0,0,255,'B'],[255,0,255,'Mg']]){
+      const Y=0.299*t[0]+0.587*t[1]+0.114*t[2], u=(t[2]-Y)/255, v=(t[0]-Y)/255;
+      const x=128+u*S, y=128-v*S; ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.strokeRect(x-4,y-4,8,8);
+      ctx.fillText(t[3], x+6, y+3); }
+  }
+
+  const DRAW = [drawHistogram, drawWaveform, drawParade, drawVectorscope];
+  scopesDraw = ()=>{
+    if(!canvas.width) return;
+    tctx.clearRect(0,0,SW,SH); tctx.drawImage(canvas, 0,0,SW,SH);
+    let data; try{ data = tctx.getImageData(0,0,SW,SH).data; }catch(e){ return; }
+    DRAW[mode](data);
   };
 }
 function scopesTick(){ if(scopesDirty){ scopesDirty = false; scopesDraw(); } requestAnimationFrame(scopesTick); }
@@ -2127,7 +2201,7 @@ function buildUI(){
   b.appendChild(snote);
 
   /* --- Scopes (Phase 9) --- */
-  b = addSection('Scopes — Histogram');
+  b = addSection('Scopes');
   buildScopesUI(b);
 
   /* --- White Balance --- */
