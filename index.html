@@ -414,6 +414,10 @@ input[type=range]::-moz-range-thumb{
   font-size:12px; padding:2px 4px; border-radius:4px; }
 .lib-x:hover{ color:#fff; background:rgba(255,80,80,.3); }
 
+.gamut-row{ display:flex; align-items:center; gap:7px; margin-top:9px; font-size:12px;
+  cursor:pointer; user-select:none; }
+.gamut-row .gamut-name{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim); }
+
 /* Filmstrip (multi-image + motion preview) */
 .filmstrip{
   position:absolute; left:50%; transform:translateX(-50%); bottom:14px;
@@ -782,6 +786,51 @@ const _clog2 = v => v<0.092864  ? -(Math.pow(10,(0.092864-v)/0.281863093)-1)/87.
 const _logc4 = (()=>{ const a=(262144-16)/117.45, b=928/1023, c=95/1023;                                  // ARRI LogC4 (ALEXA 35)
   return v => (Math.pow(2, 14*(v-c)/b + 6) - 64) / a; })();
 const _D = lin2srgbJS;                                   // linear scene -> sRGB display
+
+/* ---- Camera gamut -> Rec.709 (linear) 3x3 matrices, DERIVED from published
+   primary/white chromaticities (Lindbloom RGB->XYZ), so the values are
+   reproducible rather than memorised. All assume a D65 white (true for the
+   cinema gamuts here), so neutral grey is preserved: M*[1,1,1] = [1,1,1]. ---- */
+function _inv3(m){ const a=m[0][0],b=m[0][1],c=m[0][2],d=m[1][0],e=m[1][1],f=m[1][2],g=m[2][0],h=m[2][1],i=m[2][2];
+  const A=e*i-f*h, B=-(d*i-f*g), C=d*h-e*g, det=a*A+b*B+c*C, id=1/det;
+  return [[A*id,(c*h-b*i)*id,(b*f-c*e)*id],[B*id,(a*i-c*g)*id,(c*d-a*f)*id],[C*id,(b*g-a*h)*id,(a*e-b*d)*id]]; }
+function _mul3(m,n){ const r=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let i=0;i<3;i++) for(let j=0;j<3;j++){ let s=0; for(let k=0;k<3;k++) s+=m[i][k]*n[k][j]; r[i][j]=s; } return r; }
+function _mv3(m,v){ return [m[0][0]*v[0]+m[0][1]*v[1]+m[0][2]*v[2],
+  m[1][0]*v[0]+m[1][1]*v[1]+m[1][2]*v[2], m[2][0]*v[0]+m[2][1]*v[1]+m[2][2]*v[2]]; }
+function _rgb2xyz(R,G,B,W){ const P=(x,y)=>[x/y, 1, (1-x-y)/y];
+  const Xr=P(R[0],R[1]), Xg=P(G[0],G[1]), Xb=P(B[0],B[1]), Ww=P(W[0],W[1]);
+  const S=_mv3(_inv3([[Xr[0],Xg[0],Xb[0]],[Xr[1],Xg[1],Xb[1]],[Xr[2],Xg[2],Xb[2]]]), Ww);
+  return [[Xr[0]*S[0],Xg[0]*S[1],Xb[0]*S[2]],[Xr[1]*S[0],Xg[1]*S[1],Xb[1]*S[2]],[Xr[2]*S[0],Xg[2]*S[1],Xb[2]*S[2]]]; }
+const _D65=[0.3127,0.3290];
+const _inv709 = _inv3(_rgb2xyz([0.640,0.330],[0.300,0.600],[0.150,0.060],_D65));
+const g2709 = (R,G,B,W)=> _mul3(_inv709, _rgb2xyz(R,G,B,W));    // camera-linear -> Rec.709-linear
+const GAMUTS = {
+  none:        [[1,0,0],[0,1,0],[0,0,1]],
+  sgamut3cine: g2709([0.766,0.275],[0.225,0.800],[0.089,-0.087],_D65),     // Sony
+  sgamut3:     g2709([0.730,0.280],[0.140,0.855],[0.100,-0.050],_D65),
+  vgamut:      g2709([0.730,0.280],[0.165,0.840],[0.100,-0.030],_D65),     // Panasonic
+  canoncine:   g2709([0.740,0.270],[0.170,1.140],[0.080,-0.100],_D65),     // Canon Cinema Gamut
+  awg3:        g2709([0.684,0.313],[0.221,0.848],[0.0861,-0.102],_D65),    // ARRI Wide Gamut 3
+  awg4:        g2709([0.7347,0.2653],[0.1424,0.8576],[0.0991,-0.0308],_D65), // ARRI Wide Gamut 4
+  redwg:       g2709([0.780308,0.304253],[0.121595,1.493994],[0.095612,-0.084589],_D65), // REDWideGamutRGB
+  bmwg:        g2709([0.7177,0.3171],[0.2280,0.8616],[0.1006,-0.0820],_D65), // Blackmagic Wide Gamut
+  dgamut:      g2709([0.71,0.31],[0.21,0.88],[0.09,-0.08],_D65),           // DJI D-Gamut
+  rec2020:     g2709([0.708,0.292],[0.170,0.797],[0.131,0.046],_D65),      // Fuji F-Gamut / Nikon / Apple ~ Rec.2020
+};
+function gamutKeyFor(n){
+  if(/S-Log3/.test(n)) return 'sgamut3cine';
+  if(/S-Log/.test(n))  return 'sgamut3';
+  if(/C-Log/.test(n))  return 'canoncine';
+  if(/V-Log/.test(n))  return 'vgamut';
+  if(/F-Log|N-Log|Apple Log/.test(n)) return 'rec2020';
+  if(/LogC4/.test(n))  return 'awg4';
+  if(/LogC3/.test(n))  return 'awg3';
+  if(/Log3G10|REDLogFilm/.test(n)) return 'redwg';
+  if(/Blackmagic/.test(n)) return 'bmwg';
+  if(/D-Log/.test(n))  return 'dgamut';
+  return 'none';
+}
 const SRC_PROFILES = [
   {n:'Rec.709 / sRGB (display)',       g:'Standard',   f:v=>v},
   {n:'Linear (sRGB)',                  g:'Standard',   f:v=>_D(v)},
@@ -806,6 +855,12 @@ const SRC_PROFILES = [
   {n:'DJI D-Log (approx)',             g:'DJI',        f:v=>_D(_dlog(v))},
   {n:'Apple Log (approx)',             g:'Apple',      f:v=>_D(_apple(v))},
 ];
+// Attach each profile's camera-gamut -> Rec.709 matrix (identity for the
+// standard/display spaces). Applied in the shader's decodeSource when enabled.
+SRC_PROFILES.forEach(p=>{ p.gk = gamutKeyFor(p.n); p.m = GAMUTS[p.gk]; });
+let gamutOn = true;            // apply the gamut matrix (toggle in the Input panel)
+function activeGamutMat(){ const p = SRC_PROFILES[colorSpace]; return (gamutOn && p && p.m) ? p.m : GAMUTS.none; }
+
 function srcDecodeJS(v, idx){
   const p = SRC_PROFILES[idx] || SRC_PROFILES[0];
   return Math.min(1, Math.max(0, p.f(Math.min(1, Math.max(0, v)))));
@@ -914,13 +969,23 @@ uniform float uMatchAmount;
 /* Source-space decode baked to a 256x1 LUT (per channel) by the selected
    camera-log / colour-space profile. Rec.709 profile => identity LUT. */
 uniform sampler2D uSrcLUT;
+uniform mat3 uGamutMat;      // camera native gamut -> Rec.709 (linear); identity = off
 
 const float PI = 3.14159265;
 float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 
 /* Sample the source-decode LUT per channel (half-texel corrected, like lutAt). */
 float srcAt(float x){ return texture(uSrcLUT, vec2((clamp(x,0.0,1.0)*255.0+0.5)/256.0, 0.5)).r; }
-vec3 decodeSource(vec3 c){ return vec3(srcAt(c.r), srcAt(c.g), srcAt(c.b)); }
+float srgb2lin1(float v){ return v <= 0.04045 ? v/12.92 : pow((v+0.055)/1.055, 2.4); }
+float lin2srgb1(float v){ v = max(v,0.0); return v <= 0.0031308 ? v*12.92 : 1.055*pow(v,1.0/2.4)-0.055; }
+// Tonal decode (1-D LUT) brings log->Rec.709 display; the gamut matrix then maps
+// the camera's native primaries to Rec.709 in LINEAR light. uGamutMat=identity
+// (standard spaces / gamut off) makes this an exact no-op.
+vec3 decodeSource(vec3 c){
+  vec3 d = vec3(srcAt(c.r), srcAt(c.g), srcAt(c.b));
+  vec3 lin = uGamutMat * vec3(srgb2lin1(d.r), srgb2lin1(d.g), srgb2lin1(d.b));
+  return vec3(lin2srgb1(lin.r), lin2srgb1(lin.g), lin2srgb1(lin.b));
+}
 
 /* Rec.709 RGB <-> YCbCr (Cb/Cr centred at 0). Used by reference look-match. */
 vec3 rgb2ycc(vec3 c){
@@ -1144,7 +1209,7 @@ function buildProgram(){
     'uHslHue[0]','uHslSat[0]','uHslLum[0]',
     'uSplitShadowHue','uSplitShadowSat','uSplitHighHue','uSplitHighSat',
     'uSplitBalance','uFade','uFadeRolloff',
-    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uSrcLUT',
+    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uSrcLUT','uGamutMat',
     'uBake','uLutSize','uTilesPerRow'];
   names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
 }
@@ -1243,6 +1308,9 @@ function uploadImage(src){
 // Push the whole grade (and colour space) to the shader. Shared by the live
 // preview and the LUT bake, so an exported .cube matches the preview exactly.
 function setGradeUniforms(){
+  const m = activeGamutMat();          // camera gamut -> Rec.709 (column-major for GL)
+  gl.uniformMatrix3fv(uniforms['uGamutMat'], false, [
+    m[0][0], m[1][0], m[2][0],  m[0][1], m[1][1], m[2][1],  m[0][2], m[1][2], m[2][2] ]);
   gl.uniform1f(uniforms['uTemp'], grade.temp);
   gl.uniform1f(uniforms['uTint'], grade.tint);
   gl.uniform1f(uniforms['uExposure'], grade.exposure);
@@ -1306,10 +1374,13 @@ function render(){
    square FBO), read it back, and serialise to .cube / HALD .png. Because every
    control is identity at its default, a neutral grade exports an identity LUT.
    -------------------------------------------------------------------------- */
-// Bake an S^3 LUT to an RGBA8 buffer. Layout: S slices (blue) tiled `cols` wide.
+// Bake an S^3 LUT into a tiled FBO and read it back. Layout: S slices (blue)
+// tiled `cols` wide. With EXT_color_buffer_float we read 32-bit float (no 1/255
+// quantisation) so .cube nodes are full precision; otherwise 8-bit fallback.
 function bakeLUT(S){
   const cols = Math.ceil(Math.sqrt(S)), rows = Math.ceil(S/cols);
   const W = S*cols, H = S*rows;
+  let floatOK = !!gl.getExtension('EXT_color_buffer_float');
   const ftex = gl.createTexture();
   gl.activeTexture(gl.TEXTURE2);
   gl.bindTexture(gl.TEXTURE_2D, ftex);
@@ -1317,10 +1388,15 @@ function bakeLUT(S){
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texImage2D(gl.TEXTURE_2D, 0, floatOK ? gl.RGBA32F : gl.RGBA, W, H, 0, gl.RGBA,
+                floatOK ? gl.FLOAT : gl.UNSIGNED_BYTE, null);
   const fbo = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ftex, 0);
+  if(floatOK && gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE){
+    floatOK = false;                            // GPU can't render float — fall back to 8-bit
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  }
 
   gl.useProgram(program);
   gl.activeTexture(gl.TEXTURE1);                 // applyGrade samples the curve LUT
@@ -1337,20 +1413,21 @@ function bakeLUT(S){
   gl.viewport(0, 0, W, H);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-  const buf = new Uint8Array(W*H*4);
-  gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  const buf = floatOK ? new Float32Array(W*H*4) : new Uint8Array(W*H*4);
+  gl.readPixels(0, 0, W, H, gl.RGBA, floatOK ? gl.FLOAT : gl.UNSIGNED_BYTE, buf);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.deleteFramebuffer(fbo); gl.deleteTexture(ftex);
   gl.viewport(0, 0, canvas.width, canvas.height);
   render();                                      // restore the live preview
   // value(r,g,b) -> [R,G,B] in 0..1 from the tiled buffer
+  const sc = floatOK ? 1 : 1/255;
   const at = (r,g,b)=>{
     const tc = b%cols, tr = (b - tc)/cols;
     const o = (((tr*S + g)*W) + (tc*S + r))*4;
-    return [buf[o]/255, buf[o+1]/255, buf[o+2]/255];
+    return [buf[o]*sc, buf[o+1]*sc, buf[o+2]*sc];
   };
-  return {S, cols, at};
+  return {S, cols, at, precision: floatOK ? 'float32' : 'uint8'};
 }
 // Serialise a baked LUT to Resolve/Premiere-style .cube text (red fastest).
 function lutToCube(lut, title){
@@ -1371,8 +1448,9 @@ function downloadBlob(filename, blob){
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
 }
 function exportCube(size, title){
-  const txt = lutToCube(bakeLUT(size), title || 'MEAT LUT');
-  downloadBlob(sanitizeName(title)+'_'+size+'.cube', new Blob([txt], {type:'text/plain'}));
+  const lut = bakeLUT(size);
+  downloadBlob(sanitizeName(title)+'_'+size+'.cube', new Blob([lutToCube(lut, title || 'MEAT LUT')], {type:'text/plain'}));
+  setStatus('Exported ' + size + '³ .cube — ' + (lut.precision === 'float32' ? 'high-precision float nodes' : '8-bit nodes (no float buffer)'));
 }
 // True HALD CLUT .png (level 8 => 64^3 in a 512x512 raster, red fastest).
 function exportHald(title){
@@ -2324,10 +2402,24 @@ function buildUI(){
     commitChange();
   });
   b.appendChild(spaceSel);
+
+  // Gamut matrix toggle (camera native primaries -> Rec.709 in linear light)
+  const gRow = document.createElement('label'); gRow.className = 'gamut-row';
+  const gChk = document.createElement('input'); gChk.type = 'checkbox'; gChk.checked = gamutOn;
+  const gTxt = document.createElement('span');
+  const gName = document.createElement('span'); gName.className = 'gamut-name';
+  const updGamutName = ()=>{ const p = SRC_PROFILES[colorSpace];
+    gName.textContent = (p && p.gk && p.gk !== 'none') ? ('· ' + p.gk) : '· (no matrix for this space)'; };
+  gTxt.textContent = 'Apply gamut → Rec.709 ';
+  gChk.addEventListener('change', ()=>{ gamutOn = gChk.checked; render(); refreshVariations(); });
+  spaceSel.addEventListener('change', updGamutName);
+  gRow.append(gChk, gTxt, gName); b.appendChild(gRow); updGamutName();
+
   const snote = document.createElement('div'); snote.className = 'curve-hint';
   snote.innerHTML = 'Tells the LUT what your footage is encoded as — picking a camera log makes the exported '
-    + '.cube a <b>“[log] → Rec.709”</b> conversion. Tonal decode only (no gamut matrix), so fine-tune '
-    + 'saturation; “(approx)” curves should be checked against the maker’s LUT before selling.';
+    + '.cube a <b>“[log] → Rec.709”</b> conversion. <b>Apply gamut</b> maps the camera’s native primaries to '
+    + 'Rec.709 in linear light (derived from published chromaticities); turn it off for tonal-only. '
+    + '“(approx)” curves should be checked against the maker’s LUT before selling.';
   b.appendChild(snote);
 
   /* --- Scopes (Phase 9) --- */

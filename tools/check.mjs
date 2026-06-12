@@ -61,6 +61,7 @@ for(const [name, pat] of [
   ['zip pack','makeZip'], ['cover image','buildCoverCanvas'], ['scopes','scopesDraw'],
   ['waveform','drawWaveform'], ['rgb parade','drawParade'], ['vectorscope','drawVectorscope'],
   ['preview modes','setViewMode'], ['media+looks library','buildLibraryUI'], ['saved looks store','getLooks'],
+  ['gamut matrix','uGamutMat'], ['gamut derivation','g2709'], ['float lut bake','RGBA32F'],
   ['workspace panels','layoutPanels'], ['panel drag','makeDraggable'], ['layout save','saveLayout'],
   ['drag-drop overlay','dropOverlay'],
   ['undo/redo history','pushHistory'], ['apply snapshot','applyState'], ['mobile layout','isNarrow'],
@@ -76,7 +77,7 @@ console.log('4) Pure-logic unit tests');
   const api = new Function(
     line(/const clamp01 = [^\n]*;/) + '\n' + fn('makeSpline') + '\n' + fn('matchControls') + '\n' +
     srcRegion + '\n' + fn('jpegEnd') + '\n' + fn('extractEmbeddedJpeg') + '\n' +
-    'return {makeSpline, matchControls, srcDecodeJS, SRC_PROFILES, jpegEnd, extractEmbeddedJpeg};'
+    'return {makeSpline, matchControls, srcDecodeJS, SRC_PROFILES, GAMUTS, jpegEnd, extractEmbeddedJpeg};'
   )();
 
   // tone-curve spline: diagonal is identity, monotone has no overshoot
@@ -119,6 +120,21 @@ console.log('4) Pure-logic unit tests');
   // Canon C-Log / C-Log2 present alongside C-Log3
   assert(api.SRC_PROFILES.some(p=>/C-Log2/.test(p.n)) && api.SRC_PROFILES.some(p=>/C-Log$/.test(p.n)), 'Canon C-Log & C-Log2 present');
   assert(api.SRC_PROFILES.length >= 20, `profile count (${api.SRC_PROFILES.length}) covers the camera logs`);
+
+  // gamut matrices: derived from D65 primaries, so neutral grey is preserved
+  // (each row sums to 1, i.e. M*[1,1,1]=[1,1,1]); Rec.709 space is identity.
+  const rowsum = (m,r)=> m[r][0]+m[r][1]+m[r][2];
+  for(const [k,m] of Object.entries(api.GAMUTS)){
+    for(let r=0;r<3;r++) assert(Math.abs(rowsum(m,r)-1) < 1e-6, `gamut ${k} preserves grey (row ${r})`);
+  }
+  const isId = m => [0,1,2].every(i=>[0,1,2].every(j=>Math.abs(m[i][j]-(i===j?1:0))<1e-9));
+  assert(isId(api.GAMUTS.none), 'identity gamut is identity');
+  assert(!isId(api.GAMUTS.sgamut3cine) && !isId(api.GAMUTS.awg4), 'wide gamuts are non-identity');
+  // every profile carries a gamut matrix; standard spaces stay identity
+  assert(api.SRC_PROFILES.every(p=>Array.isArray(p.m)), 'every profile has a gamut matrix');
+  assert(isId(api.SRC_PROFILES[0].m), 'Rec.709 profile gamut is identity');
+  const slog3 = api.SRC_PROFILES.find(p=>/S-Log3/.test(p.n));
+  assert(slog3.gk === 'sgamut3cine' && !isId(slog3.m), 'S-Log3 uses S-Gamut3.Cine matrix');
 
   // RAW embedded-JPEG scan: pick the largest preview, skip nested thumbnail
   const jpeg = (n, nested) => { const a=[0xFF,0xD8];

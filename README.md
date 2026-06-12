@@ -153,6 +153,15 @@ is exact.
   be transcoded first.
 - Load several stills for a filmstrip + motion preview, or drag-and-drop.
 
+## Color accuracy
+
+Each camera-log profile carries a **gamut matrix** (camera native primaries →
+Rec.709, derived from published chromaticities) applied in linear light — toggle
+**Apply gamut → Rec.709** in the Input panel. Preview and the exported LUT use
+the exact same decode path, so what you grade is what you export. `.cube` LUTs
+are baked through a **float (RGBA32F) framebuffer** when the GPU supports it, so
+nodes are full precision (no 8-bit banding); otherwise an 8-bit fallback.
+
 ## Workspace
 
 Every control group is a **floating panel** (Premiere-style): drag it by its
