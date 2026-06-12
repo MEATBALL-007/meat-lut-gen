@@ -164,10 +164,14 @@ nodes are full precision (no 8-bit banding); otherwise an 8-bit fallback.
 
 ## Workspace
 
-Every control group is a **floating panel** (Premiere-style): drag it by its
-header anywhere, resize from the bottom-right corner, collapse (▾) or close (✕).
-The **Panels** menu in the top bar toggles any panel and has **Reset layout**;
-your arrangement is saved to `localStorage` and restored next time.
+A **docked workspace** like Premiere Pro: control groups are **tabs** inside
+**frames** docked in left/right columns, so many panels stack in one window —
+click a tab to switch. **Drag a tab** onto another frame to group it there, or
+onto a dock / the preview's left|right half to dock it on that side. Dock widths
+resize by dragging the splitter; close a panel with the ✕ on its tab. The
+**Panels** menu toggles any panel and has **Reset layout**; your arrangement is
+saved to `localStorage` and restored next time. On phones the docks stack into a
+scrollable column under the preview.
 
 ## Save your work
 

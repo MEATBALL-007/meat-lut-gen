@@ -92,13 +92,14 @@ button.btn:disabled{ opacity:.4; cursor:default; border-color:var(--line); color
    -------------------------------------------------------------------------- */
 main{
   flex:1 1 auto;
-  position:relative;
+  display:flex;
   min-height:0;
+  min-width:0;
 }
 
 /* --- Preview side --- */
 .preview-pane{
-  position:absolute; inset:0;
+  position:relative; flex:1 1 auto;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -161,35 +162,51 @@ main{
   border:1px solid var(--line); border-radius:8px; padding:6px 8px;
 }
 
-/* --- Controls side --- */
-/* Floating workspace panels (Premiere-style: move / resize / dock anywhere) */
-#panels{ position:fixed; inset:54px 0 30px 0; pointer-events:none; z-index:20; }
-.panel{
-  position:absolute; pointer-events:auto; width:340px; max-height:84vh;
-  display:flex; flex-direction:column; overflow:hidden;
+/* --- Controls side: Premiere-style docked workspace --------------------------
+   Panels live in left/right dock COLUMNS as tabbed FRAMES (stack many panels in
+   one window; click a tab to switch). Drag a tab to another frame to group it,
+   or to a dock / the preview edge to dock it there. Dock width is resizable. */
+.dock{
+  flex:0 0 auto; width:344px; min-width:210px; max-width:640px;
+  display:flex; flex-direction:column; gap:8px; padding:8px;
+  overflow-y:auto; overflow-x:hidden;
+  background:var(--bg); border-left:1px solid var(--line);
+}
+.dock.left{ border-left:none; border-right:1px solid var(--line); }
+.dock.empty{ display:none; }
+.dock.drop-target{ box-shadow:inset 0 0 0 2px var(--accent); }
+.dock::-webkit-scrollbar{ width:9px; }
+.dock::-webkit-scrollbar-thumb{ background:var(--surface-2); border-radius:6px; }
+.dock-resizer{ flex:0 0 auto; width:6px; cursor:col-resize; background:transparent; }
+.dock-resizer:hover{ background:var(--accent); }
+.dock-resizer.hidden{ display:none; }
+
+.frame{
+  flex:0 0 auto; display:flex; flex-direction:column; overflow:hidden;
   background:var(--surface); border:1px solid var(--line); border-radius:8px;
-  box-shadow:0 12px 34px rgba(0,0,0,.5);
 }
-.panel.collapsed{ height:auto !important; }
-.panel.collapsed .panel-body, .panel.collapsed .panel-resize{ display:none; }
-.panel-head{
-  flex:0 0 auto; display:flex; align-items:center; gap:6px; cursor:move; user-select:none;
-  padding:8px 8px 8px 11px; background:var(--surface-2); border-bottom:1px solid var(--line);
+.frame.drop-target{ box-shadow:0 0 0 2px var(--accent); }
+.frame-tabs{
+  flex:0 0 auto; display:flex; flex-wrap:wrap; gap:3px; padding:5px 6px;
+  background:var(--surface-2); border-bottom:1px solid var(--line);
 }
-.panel.collapsed .panel-head{ border-bottom:none; }
-.panel-title{ flex:1; font-weight:600; font-size:12.5px; letter-spacing:.3px;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.panel-head .pbtn{
-  flex:0 0 auto; width:20px; height:20px; line-height:1; border:none; border-radius:4px;
-  background:none; color:var(--text-dim); cursor:pointer; font-size:13px; font-family:var(--font-mono);
+.tab{
+  display:flex; align-items:center; gap:6px; padding:4px 9px; border-radius:5px;
+  font-size:12px; font-weight:600; color:var(--text-dim); cursor:grab;
+  white-space:nowrap; user-select:none; touch-action:none;
 }
-.panel-head .pbtn:hover{ color:#fff; background:var(--line); }
-.panel-body{ flex:1 1 auto; overflow:auto; padding:4px 14px 14px; }
-.panel-body::-webkit-scrollbar{ width:9px; }
-.panel-body::-webkit-scrollbar-thumb{ background:var(--surface-2); border-radius:6px; }
-.panel-resize{
-  position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize;
-  background:linear-gradient(135deg, transparent 45%, var(--line) 45% 60%, transparent 60%);
+.tab:hover{ background:var(--line); color:var(--text); }
+.tab.active{ background:var(--surface); color:#fff; box-shadow:0 1px 0 var(--accent) inset; }
+.tab.dragging{ opacity:.35; }
+.tab .tx{ font-size:11px; color:var(--text-dim); border-radius:3px; padding:0 2px; }
+.tab .tx:hover{ color:#fff; background:rgba(255,80,80,.35); }
+.frame-body{ flex:1 1 auto; overflow:auto; max-height:74vh; }
+.frame-body::-webkit-scrollbar{ width:9px; }
+.frame-body::-webkit-scrollbar-thumb{ background:var(--surface-2); border-radius:6px; }
+.panel-body{ padding:8px 14px 14px; }
+.dock-ghost{
+  position:fixed; z-index:9999; pointer-events:none; padding:4px 10px; font-size:12px;
+  font-weight:700; background:var(--accent); color:#08130d; border-radius:5px; box-shadow:0 4px 14px rgba(0,0,0,.5);
 }
 
 /* Full-window drag-and-drop overlay */
@@ -481,10 +498,8 @@ footer .dot{ color:var(--ok); }
 
 /* --------------------------------------------------------------------------
    MOBILE / NARROW WORKSPACE
-   Free-floating panels are unusable on a phone, so below 760px we collapse the
-   workspace into a stacked, scrollable column under the preview. The !important
-   rules override the inline left/top/width/height the drag manager writes, so
-   the same panels just reflow — no separate mobile DOM.
+   On a phone the docks stack below the preview as full-width tabbed frames and
+   the whole column scrolls; tab bars scroll horizontally. Dock resizers hide.
    -------------------------------------------------------------------------- */
 @media (max-width: 760px){
   header{ flex-wrap:wrap; gap:8px; padding:8px 12px; }
@@ -492,17 +507,13 @@ footer .dot{ color:var(--ok); }
   header .spacer{ display:none; }
   header .btn{ padding:7px 10px; font-size:12px; }
 
-  main{ display:flex; flex-direction:column; }
-  .preview-pane{ position:relative; inset:auto; flex:0 0 auto; height:40vh; padding:10px; }
-
-  #panels{ position:relative; inset:auto; pointer-events:auto;
-    flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
-    display:flex; flex-direction:column; gap:8px; padding:8px; }
-  .panel{ position:relative !important; left:auto !important; top:auto !important;
-    width:auto !important; height:auto !important; max-height:none !important;
-    z-index:auto !important; box-shadow:none; }
-  .panel-head{ cursor:default; }
-  .panel-resize{ display:none; }      /* no corner-resize on touch */
+  main{ flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .preview-pane{ flex:0 0 auto; height:40vh; padding:10px; }
+  .dock{ width:auto !important; max-width:none; border:none !important;
+    border-top:1px solid var(--line) !important; }
+  .dock-resizer{ display:none; }
+  .frame-tabs{ flex-wrap:nowrap; overflow-x:auto; }
+  .frame-body{ max-height:none; }
 }
 @media (max-width: 760px) and (orientation:landscape){
   .preview-pane{ height:62vh; }
@@ -544,6 +555,10 @@ footer .dot{ color:var(--ok); }
 
 <!-- =========================== MAIN =========================== -->
 <main>
+  <!-- Left dock column (Premiere-style, filled by JS) -->
+  <div class="dock left empty" id="dockLeft"></div>
+  <div class="dock-resizer left hidden" id="resizeLeft"></div>
+
   <!-- Preview -->
   <section class="preview-pane" id="previewPane">
     <div class="preview-wrap" id="previewWrap">
@@ -560,8 +575,9 @@ footer .dot{ color:var(--ok); }
     </div>
   </section>
 
-  <!-- Floating workspace panels are generated into here by JS -->
-  <div id="panels"></div>
+  <!-- Right dock column (Premiere-style, filled by JS) -->
+  <div class="dock-resizer right hidden" id="resizeRight"></div>
+  <div class="dock right empty" id="dockRight"></div>
 </main>
 
 <!-- Drag-and-drop overlay (shown while dragging a file anywhere over the window) -->
@@ -1650,115 +1666,242 @@ function makeDefaultImage(){
 /* --------------------------------------------------------------------------
    6. CONTROL UI GENERATION
    -------------------------------------------------------------------------- */
-/* Floating workspace panels. addSection() still returns a body element, so all
-   control-building code is unchanged; panels can be dragged / resized / closed
-   and the layout persists in localStorage (Premiere-style workspace). */
-const panelsEl = document.getElementById('panels');
+/* ---------------------------------------------------------------------------
+   DOCKED WORKSPACE (Premiere-style)
+   Panels are tabbed FRAMES inside left/right dock COLUMNS, so you can stack many
+   panels in one window and click a tab to switch. addSection() still returns a
+   body element (unchanged contract); layoutPanels() distributes panels into
+   frames per a default map or the saved layout. Drag a tab onto another frame to
+   group it there, or onto a dock / the preview's left|right half to dock it.
+   Every panel body stays attached (inactive tabs are display:none) so all the
+   slider/refresh code keeps working regardless of which tab is showing.
+   --------------------------------------------------------------------------- */
 const PANELS = [];
-let zTop = 30;
-const LAYOUT_KEY = 'meatlut.layout.v1';
+const LAYOUT_KEY = 'meatlut.layout.v2';
+const isNarrow = ()=> window.matchMedia('(max-width: 760px)').matches;
 
-function place(p){
-  p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px'; p.el.style.width = p.w + 'px';
-  if(p.h){ p.el.style.height = p.h + 'px'; p.el.style.maxHeight = 'none'; }
-  else   { p.el.style.height = ''; p.el.style.maxHeight = ''; }
-}
-function setCollapsed(p, v){ p.collapsed = v; p.el.classList.toggle('collapsed', v);
-  p.head.querySelector('.pbtn').textContent = v ? '▸' : '▾'; }
-function setHidden(p, v){ p.hidden = v; p.el.style.display = v ? 'none' : 'flex'; }
-function bringFront(p){ p.z = ++zTop; p.el.style.zIndex = p.z; }
+const DOCKS = {
+  left:  { el: document.getElementById('dockLeft'),  resizer: document.getElementById('resizeLeft'),  frames: [] },
+  right: { el: document.getElementById('dockRight'), resizer: document.getElementById('resizeRight'), frames: [] },
+};
+let frameSeq = 0;
 
-const isNarrow = ()=> window.matchMedia('(max-width: 760px)').matches;   // mobile = stacked layout
-function makeDraggable(p){
-  p.head.addEventListener('pointerdown', e=>{
-    if(e.target.closest('.pbtn') || isNarrow()) return;   // on mobile, let the header scroll
-    bringFront(p);
-    const host = panelsEl.getBoundingClientRect(), r = p.el.getBoundingClientRect();
-    const ox = e.clientX - r.left, oy = e.clientY - r.top;
-    const mv = ev=>{
-      let nx = ev.clientX - host.left - ox, ny = ev.clientY - host.top - oy;
-      p.x = Math.max(-r.width + 64, Math.min(host.width - 64, nx));
-      p.y = Math.max(0, Math.min(host.height - 28, ny));
-      p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px';
-    };
-    const up = ()=>{ document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); saveLayout(); };
-    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
-    e.preventDefault();
-  });
+// Default grouping (keys MUST match addSection titles exactly).
+const DEFAULT_LAYOUT = {
+  left: [
+    ['Film Stock','Reference Match','Input — Source / Camera Log'],
+    ['Scopes','Library — Media & Looks'],
+  ],
+  right: [
+    ['White Balance','Tone','3-Way Color (Lift / Gamma / Gain)','Tone Curve'],
+    ['HSL / Color Mixer','Saturation & Vibrance','Split Toning','Faded Black'],
+    ['Variations','Export LUT','LUT Pack'],
+  ],
+};
+// Short, friendly tab labels for the long section titles.
+const TAB_NAMES = {
+  'Input — Source / Camera Log':'Input', '3-Way Color (Lift / Gamma / Gain)':'3-Way',
+  'Library — Media & Looks':'Library', 'Saturation & Vibrance':'Saturation',
+  'HSL / Color Mixer':'HSL', 'Reference Match':'Ref Match', 'Tone Curve':'Curve',
+};
+const tabName  = k => TAB_NAMES[k] || k;
+const panelByKey = k => PANELS.find(p=>p.key === k);
+function defaultZoneOf(key){
+  for(const z of ['left','right']) if(DEFAULT_LAYOUT[z].some(g=>g.includes(key))) return z;
+  return 'right';
 }
-function makeResizable(p){
-  p.resize.addEventListener('pointerdown', e=>{
-    if(isNarrow()) return;
-    e.stopPropagation(); bringFront(p);
-    const r = p.el.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, sw = r.width, sh = r.height;
-    const mv = ev=>{
-      p.w = Math.max(220, sw + ev.clientX - sx); p.h = Math.max(90, sh + ev.clientY - sy);
-      p.el.style.width = p.w + 'px'; p.el.style.height = p.h + 'px'; p.el.style.maxHeight = 'none';
-    };
-    const up = ()=>{ document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); saveLayout(); };
-    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
-    e.preventDefault();
-  });
-}
+
+/* addSection: register a panel, return its (detached) body for control building. */
 function addSection(title, open=false){
-  const el = document.createElement('div'); el.className = 'panel';
-  const head = document.createElement('div'); head.className = 'panel-head';
-  const t = document.createElement('span'); t.className = 'panel-title'; t.textContent = title;
-  const bCol = document.createElement('button'); bCol.className = 'pbtn'; bCol.title = 'Collapse';
-  const bClose = document.createElement('button'); bClose.className = 'pbtn'; bClose.textContent = '✕'; bClose.title = 'Close';
-  head.append(t, bCol, bClose);
   const body = document.createElement('div'); body.className = 'panel-body';
-  const resize = document.createElement('div'); resize.className = 'panel-resize';
-  el.append(head, body, resize);
-  panelsEl.appendChild(el);
-
-  const p = { key:title, el, head, body, resize, collapsed:false, hidden:false, x:8, y:8, w:340, h:0, z:0 };
-  PANELS.push(p);
-  setCollapsed(p, !open);
-  el.addEventListener('pointerdown', ()=> bringFront(p), true);
-  bCol.addEventListener('click', e=>{ e.stopPropagation(); setCollapsed(p, !p.collapsed); saveLayout(); });
-  head.addEventListener('dblclick', e=>{ if(!e.target.closest('.pbtn')){ setCollapsed(p, !p.collapsed); saveLayout(); } });
-  bClose.addEventListener('click', e=>{ e.stopPropagation(); setHidden(p, true); saveLayout(); buildPanelsMenu(); });
-  makeDraggable(p); makeResizable(p);
+  PANELS.push({ key:title, body, open:!!open, hidden:false, tabEl:null, frame:null });
   return body;
 }
 
-function autoTile(){
-  const host = panelsEl.getBoundingClientRect(), H = host.height;
-  let x = Math.max(6, host.width - 352), y = 6;
-  for(const p of PANELS){
-    if(p.hidden) continue;
-    p.w = 340; p.h = 0; place(p);
-    const h = p.el.offsetHeight || 40;
-    if(y + h > H - 6 && y > 6){ x = Math.max(6, x - 352); y = 6; }
-    p.x = x; p.y = y; place(p); bringFront(p);
-    y += h + 8;
+/* ---- frames -------------------------------------------------------------- */
+function makeFrame(zone){
+  const el = document.createElement('div'); el.className = 'frame';
+  const tabs = document.createElement('div'); tabs.className = 'frame-tabs';
+  const bodyHost = document.createElement('div'); bodyHost.className = 'frame-body';
+  el.append(tabs, bodyHost);
+  const fr = { id:'f'+(++frameSeq), zone, el, tabs, bodyHost, panels:[], active:null };
+  DOCKS[zone].frames.push(fr); DOCKS[zone].el.appendChild(el);
+  return fr;
+}
+function frameByEl(el){ for(const z of ['left','right']){ const fr = DOCKS[z].frames.find(f=>f.el === el); if(fr) return fr; } return null; }
+function removeFrame(fr){ const a = DOCKS[fr.zone].frames, i = a.indexOf(fr); if(i>=0) a.splice(i,1); fr.el.remove(); }
+
+function addPanelToFrame(fr, p, index){
+  p.frame = fr;
+  const tab = document.createElement('div'); tab.className = 'tab';
+  const lab = document.createElement('span'); lab.textContent = tabName(p.key); tab.appendChild(lab);
+  const x = document.createElement('span'); x.className = 'tx'; x.textContent = '✕'; x.title = 'Close panel'; tab.appendChild(x);
+  p.tabEl = tab;
+  tab.addEventListener('click', e=>{ if(e.target === x) return; activateTab(p); });
+  x.addEventListener('click', e=>{ e.stopPropagation(); hidePanel(p); });
+  enableTabDrag(p);
+  if(index == null || index >= fr.panels.length){ fr.panels.push(p); fr.tabs.appendChild(tab); }
+  else { fr.panels.splice(index, 0, p); fr.tabs.insertBefore(tab, fr.tabs.children[index]); }
+  fr.bodyHost.appendChild(p.body);            // body stays attached; visibility via activateTab
+  p.body.style.display = 'none';
+}
+function activateTab(p){
+  const fr = p.frame; if(!fr) return; fr.active = p;
+  fr.panels.forEach(q=>{ q.tabEl.classList.toggle('active', q === p); q.body.style.display = (q === p) ? '' : 'none'; });
+  scopesDirty = true;
+}
+function removePanelFromFrame(p){
+  const fr = p.frame; if(!fr) return;
+  const i = fr.panels.indexOf(p); if(i >= 0) fr.panels.splice(i, 1);
+  if(p.tabEl) p.tabEl.remove();
+  if(p.body.parentNode) p.body.parentNode.removeChild(p.body);
+  p.frame = null;
+  if(fr.panels.length === 0) removeFrame(fr);
+  else if(fr.active === p) activateTab(fr.panels[Math.min(i, fr.panels.length - 1)]);
+}
+function hidePanel(p){ removePanelFromFrame(p); p.hidden = true; updateDockEmptyState(); buildPanelsMenu(); saveLayout(); }
+function showPanel(p){
+  p.hidden = false; const zone = defaultZoneOf(p.key);
+  const fr = DOCKS[zone].frames[0] || makeFrame(zone);
+  addPanelToFrame(fr, p); activateTab(p);
+  updateDockEmptyState(); buildPanelsMenu(); saveLayout();
+}
+function updateDockEmptyState(){
+  for(const z of ['left','right']){
+    const empty = DOCKS[z].frames.length === 0;
+    DOCKS[z].el.classList.toggle('empty', empty);
+    DOCKS[z].resizer.classList.toggle('hidden', empty);
   }
 }
+
+/* ---- tab drag & drop (group into a frame / dock to a side) --------------- */
+let ghostEl = null;
+function clearHighlights(){ document.querySelectorAll('.drop-target').forEach(e=>e.classList.remove('drop-target')); }
+function dropInfoAt(x, y){
+  const el = document.elementFromPoint(x, y); if(!el) return null;
+  const frameEl = el.closest('.frame');
+  if(frameEl){ const fr = frameByEl(frameEl); if(fr) return { type:'frame', fr }; }
+  const dockEl = el.closest('.dock');
+  if(dockEl) return { type:'dock', zone: dockEl === DOCKS.left.el ? 'left' : 'right' };
+  const pv = document.getElementById('previewPane');
+  if(pv && (el === pv || pv.contains(el))){ const r = pv.getBoundingClientRect();
+    return { type:'dock', zone: x < r.left + r.width/2 ? 'left' : 'right' }; }
+  return null;
+}
+function highlightTarget(x, y){
+  clearHighlights(); const info = dropInfoAt(x, y); if(!info) return;
+  if(info.type === 'frame') info.fr.el.classList.add('drop-target');
+  else DOCKS[info.zone].el.classList.add('drop-target');
+}
+function enableTabDrag(p){
+  p.tabEl.addEventListener('pointerdown', e=>{
+    if(e.target.classList.contains('tx') || isNarrow() || e.button !== 0) return;
+    const sx = e.clientX, sy = e.clientY; let dragging = false;
+    const move = ev=>{
+      if(!dragging){ if(Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 6) return;
+        dragging = true; activateTab(p); p.tabEl.classList.add('dragging');
+        ghostEl = document.createElement('div'); ghostEl.className = 'dock-ghost'; ghostEl.textContent = tabName(p.key);
+        document.body.appendChild(ghostEl); }
+      ghostEl.style.left = (ev.clientX + 10) + 'px'; ghostEl.style.top = (ev.clientY + 12) + 'px';
+      highlightTarget(ev.clientX, ev.clientY);
+    };
+    const up = ev=>{
+      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+      if(!dragging) return;
+      p.tabEl.classList.remove('dragging'); if(ghostEl){ ghostEl.remove(); ghostEl = null; } clearHighlights();
+      dropPanel(p, ev.clientX, ev.clientY);
+    };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    e.preventDefault();
+  });
+}
+function dropPanel(p, x, y){
+  const info = dropInfoAt(x, y); if(!info) return;
+  if(info.type === 'frame'){
+    if(info.fr === p.frame) return;                       // dropped on its own frame: no change
+    const zone = info.fr.zone; removePanelFromFrame(p);
+    let fr = info.fr;
+    if(!DOCKS[zone].frames.includes(fr)) fr = makeFrame(zone);   // frame vanished (was source & emptied)
+    addPanelToFrame(fr, p); activateTab(p);
+  } else {                                                 // dock / preview edge -> new frame in that column
+    if(p.frame && p.frame.panels.length === 1 && p.frame.zone === info.zone) return;  // already alone there
+    removePanelFromFrame(p);
+    const fr = makeFrame(info.zone); addPanelToFrame(fr, p); activateTab(p);
+  }
+  updateDockEmptyState(); buildPanelsMenu(); saveLayout();
+}
+
+/* ---- dock width resizing -------------------------------------------------- */
+function enableDockResize(zone){
+  DOCKS[zone].resizer.addEventListener('pointerdown', e=>{
+    if(isNarrow()) return;
+    const dock = DOCKS[zone].el, sx = e.clientX, sw = dock.getBoundingClientRect().width;
+    const move = ev=>{ const w = zone === 'right' ? sw - (ev.clientX - sx) : sw + (ev.clientX - sx);
+      dock.style.width = Math.max(210, Math.min(640, w)) + 'px'; };
+    const up = ()=>{ document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); saveLayout(); };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    e.preventDefault();
+  });
+}
+enableDockResize('left'); enableDockResize('right');
+
+/* ---- layout build / persistence ------------------------------------------ */
+function clearDocks(){
+  for(const z of ['left','right']){ DOCKS[z].frames.forEach(fr=>fr.el.remove()); DOCKS[z].frames = []; }
+  PANELS.forEach(p=>{ p.frame = null; p.tabEl = null; if(p.body.parentNode) p.body.parentNode.removeChild(p.body); });
+}
+function buildDefaultLayout(){
+  clearDocks(); PANELS.forEach(p=> p.hidden = false);
+  for(const zone of ['left','right']){
+    for(const group of DEFAULT_LAYOUT[zone]){
+      const present = group.map(panelByKey).filter(Boolean);
+      if(!present.length) continue;
+      const fr = makeFrame(zone); present.forEach(p=> addPanelToFrame(fr, p));
+      activateTab(present.find(p=>p.open) || present[0]);
+    }
+  }
+  const rest = PANELS.filter(p=>!p.frame);              // any panel not in the map
+  if(rest.length){ const fr = makeFrame('right'); rest.forEach(p=> addPanelToFrame(fr, p)); activateTab(rest[0]); }
+  updateDockEmptyState();
+}
 function saveLayout(){
-  const data = {};
-  for(const p of PANELS) data[p.key] = {x:p.x, y:p.y, w:p.w, h:p.h, collapsed:p.collapsed, hidden:p.hidden, z:p.z||0};
+  const data = { docks:{}, widths:{}, hidden: PANELS.filter(p=>p.hidden).map(p=>p.key) };
+  for(const z of ['left','right']){
+    data.docks[z] = DOCKS[z].frames.map(fr=>({ keys: fr.panels.map(p=>p.key), active: fr.active ? fr.active.key : null }));
+    if(DOCKS[z].el.style.width) data.widths[z] = DOCKS[z].el.style.width;
+  }
   try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify(data)); }catch(e){}
 }
 function restoreLayout(){
-  let data = null; try{ data = JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null'); }catch(e){}
-  if(!data) return false;
-  for(const p of PANELS){
-    const s = data[p.key]; if(!s) continue;
-    p.x = s.x; p.y = s.y; p.w = s.w || 340; p.h = s.h || 0;
-    setCollapsed(p, !!s.collapsed); setHidden(p, !!s.hidden);
-    if(s.z){ p.z = s.z; zTop = Math.max(zTop, s.z); p.el.style.zIndex = s.z; }
-    place(p);
+  let data; try{ data = JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null'); }catch(e){}
+  if(!data || !data.docks) return false;
+  clearDocks();
+  const hidden = new Set(data.hidden || []); PANELS.forEach(p=> p.hidden = hidden.has(p.key));
+  for(const z of ['left','right']){
+    for(const f of (data.docks[z] || [])){
+      const present = (f.keys || []).map(panelByKey).filter(p=>p && !p.hidden);
+      if(!present.length) continue;
+      const fr = makeFrame(z); present.forEach(p=> addPanelToFrame(fr, p));
+      activateTab(present.find(p=>p.key === f.active) || present[0]);
+    }
+    if(data.widths[z]) DOCKS[z].el.style.width = data.widths[z];
   }
-  return true;
+  // panels added in a newer build than the saved layout -> dock them by default
+  for(const p of PANELS.filter(q=>!q.hidden && !q.frame)){
+    const zone = defaultZoneOf(p.key); const fr = DOCKS[zone].frames[0] || makeFrame(zone);
+    addPanelToFrame(fr, p); if(!fr.active) activateTab(p);
+  }
+  updateDockEmptyState();
+  return DOCKS.left.frames.length + DOCKS.right.frames.length > 0;
 }
 function resetLayout(){
   try{ localStorage.removeItem(LAYOUT_KEY); }catch(e){}
-  for(const p of PANELS){ setCollapsed(p, p.collapsed); setHidden(p, false); }
-  autoTile(); saveLayout(); buildPanelsMenu();
+  DOCKS.left.el.style.width = ''; DOCKS.right.el.style.width = '';
+  buildDefaultLayout(); saveLayout(); buildPanelsMenu();
 }
-function layoutPanels(){ if(!restoreLayout()) autoTile(); buildPanelsMenu(); }
+function layoutPanels(){ if(!restoreLayout()) buildDefaultLayout(); buildPanelsMenu(); }
 
+/* ---- Panels menu (show/hide + reset) ------------------------------------- */
 const panelsPop = document.getElementById('panelsPop');
 const panelsMenu = document.getElementById('panelsMenu');
 function buildPanelsMenu(){
@@ -1766,7 +1909,7 @@ function buildPanelsMenu(){
   for(const p of PANELS){
     const lab = document.createElement('label');
     const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !p.hidden;
-    cb.addEventListener('change', ()=>{ setHidden(p, !cb.checked); if(cb.checked) bringFront(p); saveLayout(); });
+    cb.addEventListener('change', ()=>{ cb.checked ? showPanel(p) : hidePanel(p); });
     lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + p.key));
     panelsPop.appendChild(lab);
   }
@@ -1777,13 +1920,6 @@ function buildPanelsMenu(){
 }
 document.getElementById('btnPanels').addEventListener('click', e=>{ e.stopPropagation(); panelsMenu.classList.toggle('open'); });
 document.addEventListener('click', e=>{ if(!panelsMenu.contains(e.target)) panelsMenu.classList.remove('open'); });
-window.addEventListener('resize', ()=>{
-  if(isNarrow()) return;                       // mobile uses the stacked CSS layout
-  const host = panelsEl.getBoundingClientRect();
-  for(const p of PANELS){ if(p.hidden) continue;
-    p.x = Math.max(-p.w + 64, Math.min(host.width - 64, p.x));
-    p.y = Math.max(0, Math.min(host.height - 28, p.y)); place(p); }
-});
 
 // A labelled slider bound to a getter/setter so it works for nested state too.
 function addSlider(parent, opts){
@@ -2958,7 +3094,7 @@ function init(){
   buildUI();
   bakeCurves();                      // identity LUT before first render
   bakeSrcLUT();                      // identity source-decode before first render
-  layoutPanels();                    // position the floating workspace panels
+  layoutPanels();                    // build the docked, tabbed workspace
   uploadImage(makeDefaultImage());   // show something immediately
   positionHandle();
   scopesTick();                      // start the scopes refresh loop
