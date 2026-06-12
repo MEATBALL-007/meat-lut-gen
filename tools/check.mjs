@@ -62,7 +62,7 @@ for(const [name, pat] of [
   ['waveform','drawWaveform'], ['rgb parade','drawParade'], ['vectorscope','drawVectorscope'],
   ['workspace panels','layoutPanels'], ['panel drag','makeDraggable'], ['layout save','saveLayout'],
   ['drag-drop overlay','dropOverlay'],
-  ['undo/redo history','pushHistory'], ['apply snapshot','applyState'],
+  ['undo/redo history','pushHistory'], ['apply snapshot','applyState'], ['mobile layout','isNarrow'],
   ['project save','saveProject'], ['project load','loadProject'], ['autosave','scheduleAutosave'],
 ]) assert(js.includes(pat), `${name} (${pat})`);
 

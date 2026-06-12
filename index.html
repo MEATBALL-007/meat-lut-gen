@@ -386,7 +386,7 @@ input[type=range]::-moz-range-thumb{
 
 /* Scopes */
 .scope-canvas{
-  width:100%; height:120px; display:block; border-radius:6px;
+  width:100%; height:auto; display:block; border-radius:6px;
   border:1px solid var(--line); background:#111; image-rendering:pixelated;
 }
 
@@ -450,6 +450,35 @@ footer{
   position:relative; z-index:50;
 }
 footer .dot{ color:var(--ok); }
+
+/* --------------------------------------------------------------------------
+   MOBILE / NARROW WORKSPACE
+   Free-floating panels are unusable on a phone, so below 760px we collapse the
+   workspace into a stacked, scrollable column under the preview. The !important
+   rules override the inline left/top/width/height the drag manager writes, so
+   the same panels just reflow — no separate mobile DOM.
+   -------------------------------------------------------------------------- */
+@media (max-width: 760px){
+  header{ flex-wrap:wrap; gap:8px; padding:8px 12px; }
+  header .brand{ flex:1 1 100%; }
+  header .spacer{ display:none; }
+  header .btn{ padding:7px 10px; font-size:12px; }
+
+  main{ display:flex; flex-direction:column; }
+  .preview-pane{ position:relative; inset:auto; flex:0 0 auto; height:40vh; padding:10px; }
+
+  #panels{ position:relative; inset:auto; pointer-events:auto;
+    flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    display:flex; flex-direction:column; gap:8px; padding:8px; }
+  .panel{ position:relative !important; left:auto !important; top:auto !important;
+    width:auto !important; height:auto !important; max-height:none !important;
+    z-index:auto !important; box-shadow:none; }
+  .panel-head{ cursor:default; }
+  .panel-resize{ display:none; }      /* no corner-resize on touch */
+}
+@media (max-width: 760px) and (orientation:landscape){
+  .preview-pane{ height:62vh; }
+}
 </style>
 </head>
 <body>
@@ -1519,9 +1548,10 @@ function setCollapsed(p, v){ p.collapsed = v; p.el.classList.toggle('collapsed',
 function setHidden(p, v){ p.hidden = v; p.el.style.display = v ? 'none' : 'flex'; }
 function bringFront(p){ p.z = ++zTop; p.el.style.zIndex = p.z; }
 
+const isNarrow = ()=> window.matchMedia('(max-width: 760px)').matches;   // mobile = stacked layout
 function makeDraggable(p){
   p.head.addEventListener('pointerdown', e=>{
-    if(e.target.closest('.pbtn')) return;
+    if(e.target.closest('.pbtn') || isNarrow()) return;   // on mobile, let the header scroll
     bringFront(p);
     const host = panelsEl.getBoundingClientRect(), r = p.el.getBoundingClientRect();
     const ox = e.clientX - r.left, oy = e.clientY - r.top;
@@ -1538,6 +1568,7 @@ function makeDraggable(p){
 }
 function makeResizable(p){
   p.resize.addEventListener('pointerdown', e=>{
+    if(isNarrow()) return;
     e.stopPropagation(); bringFront(p);
     const r = p.el.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, sw = r.width, sh = r.height;
     const mv = ev=>{
@@ -1627,6 +1658,7 @@ function buildPanelsMenu(){
 document.getElementById('btnPanels').addEventListener('click', e=>{ e.stopPropagation(); panelsMenu.classList.toggle('open'); });
 document.addEventListener('click', e=>{ if(!panelsMenu.contains(e.target)) panelsMenu.classList.remove('open'); });
 window.addEventListener('resize', ()=>{
+  if(isNarrow()) return;                       // mobile uses the stacked CSS layout
   const host = panelsEl.getBoundingClientRect();
   for(const p of PANELS){ if(p.hidden) continue;
     p.x = Math.max(-p.w + 64, Math.min(host.width - 64, p.x));
