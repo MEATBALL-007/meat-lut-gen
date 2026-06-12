@@ -62,6 +62,7 @@ for(const [name, pat] of [
   ['waveform','drawWaveform'], ['rgb parade','drawParade'], ['vectorscope','drawVectorscope'],
   ['preview modes','setViewMode'], ['media+looks library','buildLibraryUI'], ['saved looks store','getLooks'],
   ['gamut matrix','uGamutMat'], ['gamut derivation','g2709'], ['float lut bake','RGBA32F'],
+  ['share link','shareLink'], ['share restore','restoreFromHash'],
   ['workspace panels','layoutPanels'], ['panel drag','makeDraggable'], ['layout save','saveLayout'],
   ['drag-drop overlay','dropOverlay'],
   ['undo/redo history','pushHistory'], ['apply snapshot','applyState'], ['mobile layout','isNarrow'],

@@ -535,6 +535,7 @@ footer .dot{ color:var(--ok); }
   <button class="btn ghost" id="btnReset">Reset Grade</button>
   <button class="btn ghost" id="btnSaveProj" title="Save look as .json">Save</button>
   <button class="btn ghost" id="btnOpenProj" title="Open a .json look">Open</button>
+  <button class="btn ghost" id="btnShare" title="Copy a shareable link (look encoded in the URL)">Share</button>
   <button class="btn" id="btnExport">Export .cube</button>
   <button class="btn primary" id="btnLoad">Load Image</button>
   <input type="file" id="fileInput" accept="image/*,video/*,.arw,.cr2,.cr3,.nef,.nrw,.dng,.raf,.orf,.rw2,.pef,.srw,.sr2" multiple hidden />
@@ -2653,6 +2654,25 @@ function loadProject(file){
 }
 function setStatus(msg){ const el = document.getElementById('statusText'); if(el) el.textContent = msg; }
 
+// Backend-free "cloud" sharing: the whole look is encoded into a URL hash, so a
+// link restores it on any device. (True account sync would need a backend.)
+function shareLink(){
+  const data = btoa(unescape(encodeURIComponent(JSON.stringify(snapshot()))));
+  const url = location.origin + location.pathname + '#look=' + data;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=> setStatus('Share link copied to clipboard'),
+      ()=> prompt('Copy this share link:', url));
+  } else prompt('Copy this share link:', url);
+}
+function restoreFromHash(){
+  const m = /[#&]look=([^&]+)/.exec(location.hash); if(!m) return false;
+  try{ const doc = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+    if(doc && doc.grade){ applyingState = true; applyState(doc); applyingState = false;
+      setStatus('Loaded look from shared link'); return true; }
+  }catch(e){}
+  return false;
+}
+
 /* --------------------------------------------------------------------------
    7. SPLIT SLIDER (drag the divider)
    -------------------------------------------------------------------------- */
@@ -2915,6 +2935,7 @@ document.getElementById('btnRedo').addEventListener('click', redo);
 document.getElementById('btnSaveProj').addEventListener('click', saveProject);
 const projInput = document.getElementById('projInput');
 document.getElementById('btnOpenProj').addEventListener('click', ()=> projInput.click());
+document.getElementById('btnShare').addEventListener('click', shareLink);
 projInput.addEventListener('change', e=>{ if(e.target.files[0]) loadProject(e.target.files[0]); projInput.value=''; });
 window.addEventListener('keydown', e=>{
   const t = e.target, tag = (t.tagName||'').toLowerCase();
@@ -2942,7 +2963,7 @@ function init(){
   positionHandle();
   scopesTick();                      // start the scopes refresh loop
   document.getElementById('statusText').textContent = 'WebGL2 ready — all phases ✓';
-  restoreAutosave();                 // bring back the last session's grade (if any)
+  if(!restoreFromHash()) restoreAutosave();   // a shared link wins over autosave
   histInit();                        // seed undo history with the current state
 }
 init();
