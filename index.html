@@ -2213,6 +2213,8 @@ function loadVideo(file){
   v.src = URL.createObjectURL(file);
 }
 function setVideoSource(v, name){
+  if(!v.videoWidth || !v.videoHeight){             // audio-only / undecodable track
+    setStatus('No video track found in this file.'); return; }
   stopMotion(); clearVideoEl();
   const gen = ++videoGen;                          // invalidate any prior loop
   currentVideo = v; activeImageIndex = -1; srcImage = v;
