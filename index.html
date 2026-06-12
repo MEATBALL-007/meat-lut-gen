@@ -187,6 +187,20 @@ main{
   background:linear-gradient(135deg, transparent 45%, var(--line) 45% 60%, transparent 60%);
 }
 
+/* Full-window drag-and-drop overlay */
+#dropOverlay{
+  position:fixed; inset:0; z-index:200; display:none; pointer-events:none;
+  align-items:center; justify-content:center;
+  background:rgba(10,10,12,.72); backdrop-filter:blur(2px);
+}
+#dropOverlay.show{ display:flex; }
+#dropOverlay .drop-card{
+  border:2px dashed var(--accent); border-radius:16px; padding:48px 64px; text-align:center;
+  background:rgba(20,20,24,.85); box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+#dropOverlay .drop-card .big{ font-size:22px; font-weight:700; margin-bottom:8px; }
+#dropOverlay .drop-card .sub{ font-size:13px; color:var(--text-dim); }
+
 /* Top-bar dropdown menu (Panels) */
 .menu{ position:relative; }
 .menu-pop{
@@ -478,6 +492,14 @@ footer .dot{ color:var(--ok); }
   <!-- Floating workspace panels are generated into here by JS -->
   <div id="panels"></div>
 </main>
+
+<!-- Drag-and-drop overlay (shown while dragging a file anywhere over the window) -->
+<div id="dropOverlay">
+  <div class="drop-card">
+    <div class="big">Drop to load</div>
+    <div class="sub">images · video · RAW (ARW / CR2 / NEF / DNG …)</div>
+  </div>
+</div>
 
 <footer>
   <span class="dot">●</span>
@@ -2461,12 +2483,18 @@ vSeek.addEventListener('input', ()=>{
 const fileInput = document.getElementById('fileInput');
 document.getElementById('btnLoad').addEventListener('click',()=> fileInput.click());
 fileInput.addEventListener('change', e=>{ addImages(e.target.files); fileInput.value = ''; });
-// drag & drop onto the preview (supports multiple files)
-['dragover','drop'].forEach(ev=>{
-  document.getElementById('previewPane').addEventListener(ev, e=>{
-    e.preventDefault();
-    if(ev === 'drop' && e.dataTransfer.files.length) addImages(e.dataTransfer.files);
-  });
+// drag & drop anywhere over the window (supports multiple files), with overlay.
+// The reference-thumb handler calls stopPropagation, so dropping a reference
+// there won't also load it as a main image.
+const dropOverlay = document.getElementById('dropOverlay');
+let dragDepth = 0;
+const hasFiles = e => Array.from(e.dataTransfer?.types || []).includes('Files');
+window.addEventListener('dragenter', e=>{ if(!hasFiles(e)) return; e.preventDefault(); dragDepth++; dropOverlay.classList.add('show'); });
+window.addEventListener('dragover',  e=>{ if(!hasFiles(e)) return; e.preventDefault(); });
+window.addEventListener('dragleave', e=>{ if(!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth-1); if(dragDepth === 0) dropOverlay.classList.remove('show'); });
+window.addEventListener('drop', e=>{
+  e.preventDefault(); dragDepth = 0; dropOverlay.classList.remove('show');
+  if(e.dataTransfer.files.length) addImages(e.dataTransfer.files);
 });
 
 document.getElementById('btnSplit').addEventListener('click', e=>{
