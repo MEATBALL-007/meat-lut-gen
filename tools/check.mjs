@@ -61,6 +61,8 @@ for(const [name, pat] of [
   ['zip pack','makeZip'], ['cover image','buildCoverCanvas'], ['scopes','scopesDraw'],
   ['workspace panels','layoutPanels'], ['panel drag','makeDraggable'], ['layout save','saveLayout'],
   ['drag-drop overlay','dropOverlay'],
+  ['undo/redo history','pushHistory'], ['apply snapshot','applyState'],
+  ['project save','saveProject'], ['project load','loadProject'], ['autosave','scheduleAutosave'],
 ]) assert(js.includes(pat), `${name} (${pat})`);
 
 console.log('4) Pure-logic unit tests');

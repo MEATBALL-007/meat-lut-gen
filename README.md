@@ -160,6 +160,13 @@ header anywhere, resize from the bottom-right corner, collapse (▾) or close (�
 The **Panels** menu in the top bar toggles any panel and has **Reset layout**;
 your arrangement is saved to `localStorage` and restored next time.
 
+## Save your work
+
+Edits are tracked: **Undo / Redo** (buttons or `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z`).
+**Save** downloads the look as a `.meatlut.json` file and **Open** loads one back.
+Your latest state also **autosaves** to `localStorage` and is restored next visit
+(use **Reset Grade** to start fresh).
+
 ## Usage
 
 Open `index.html` in any WebGL2 browser. Click **Load Image** (or drag a file

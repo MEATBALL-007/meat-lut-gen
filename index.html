@@ -81,6 +81,8 @@ button.btn:hover{ border-color:var(--accent); color:#fff; }
 button.btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
 button.btn.primary:hover{ filter:brightness(1.08); }
 button.btn.ghost{ background:transparent; }
+button.btn.icon{ padding:7px 10px; font-size:15px; line-height:1; }
+button.btn:disabled{ opacity:.4; cursor:default; border-color:var(--line); color:var(--text); }
 
 /* ----------------------------------------------------------------------------
    MAIN LAYOUT: preview (flex) + controls (fixed sidebar)
@@ -464,11 +466,16 @@ footer .dot{ color:var(--ok); }
     <button class="btn" id="btnPanels">Panels ▾</button>
     <div class="menu-pop" id="panelsPop"></div>
   </div>
+  <button class="btn ghost icon" id="btnUndo" title="Undo (Ctrl/⌘+Z)" disabled>↶</button>
+  <button class="btn ghost icon" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" disabled>↷</button>
   <button class="btn" id="btnSplit">Split: On</button>
   <button class="btn ghost" id="btnReset">Reset Grade</button>
+  <button class="btn ghost" id="btnSaveProj" title="Save look as .json">Save</button>
+  <button class="btn ghost" id="btnOpenProj" title="Open a .json look">Open</button>
   <button class="btn" id="btnExport">Export .cube</button>
   <button class="btn primary" id="btnLoad">Load Image</button>
   <input type="file" id="fileInput" accept="image/*,video/*,.arw,.cr2,.cr3,.nef,.nrw,.dng,.raf,.orf,.rw2,.pef,.srw,.sr2" multiple hidden />
+  <input type="file" id="projInput" accept="application/json,.json" hidden />
 </header>
 
 <!-- =========================== MAIN =========================== -->
@@ -792,7 +799,7 @@ function applyMatch(){
   grade.exposure   = L(matchBase.exposure, m.exposure);
   grade.contrast   = L(matchBase.contrast, m.contrast);
   grade.saturation = L(matchBase.saturation, m.saturation);
-  syncUI(); render(); refreshVariations();
+  syncUI(); render(); refreshVariations(); commitChange();
 }
 
 /* --------------------------------------------------------------------------
@@ -1650,7 +1657,7 @@ function addSlider(parent, opts){
   };
   refresh();
   input.addEventListener('input', ()=>{
-    set(parseFloat(input.value)); refresh(); render();
+    set(parseFloat(input.value)); refresh(); render(); commitChange();
   });
   // allow external refresh (used by HSL band switching + global reset)
   input._refresh = ()=>{ input.value = get(); refresh(); };
@@ -1691,9 +1698,9 @@ function addWheel(parent, key, name){
     dragging=true; wheel.setPointerCapture(e.pointerId); setFromEvent(e);
   });
   wheel.addEventListener('pointermove', e=>{ if(dragging) setFromEvent(e); });
-  wheel.addEventListener('pointerup',   ()=> dragging=false);
+  wheel.addEventListener('pointerup',   ()=>{ if(dragging){ dragging=false; commitChange(); } });
   // double-click resets the wheel colour (keeps level)
-  wheel.addEventListener('dblclick', ()=>{ st().x=0; st().y=0; place(); render(); });
+  wheel.addEventListener('dblclick', ()=>{ st().x=0; st().y=0; place(); render(); commitChange(); });
 
   // master level slider beneath the wheel
   const lvl = document.createElement('div'); lvl.className='lvl';
@@ -1749,7 +1756,7 @@ function buildCurveEditor(parent){
   const reset = document.createElement('a'); reset.textContent = 'reset channel';
   reset.addEventListener('click', ()=>{
     grade.curves[activeCurve] = [[0,0],[1,1]];
-    bakeCurves(); redraw(); render();
+    bakeCurves(); redraw(); render(); commitChange();
   });
   hint.appendChild(reset);
   parent.appendChild(hint);
@@ -1764,7 +1771,7 @@ function buildCurveEditor(parent){
     return [ clamp01((e.clientX-r.left)/r.width),
              clamp01(1 - (e.clientY-r.top)/r.height) ];
   }
-  function changed(){ bakeCurves(); redraw(); render(); }
+  function changed(){ bakeCurves(); redraw(); render(); commitChange(); }
 
   let drag = null;   // index of point being dragged
   let lastTapIdx = -1, lastTapT = 0;   // for capture-proof double-tap deletion
@@ -1985,7 +1992,7 @@ function buildPresetUI(parent){
     chip.addEventListener('click', ()=>{
       presetTarget = buildPresetGrade(p); presetIntensity = 1;
       grade = effectiveGrade(presetTarget, 1);
-      syncUI(); intInput._refresh(); highlight(p.name); render(); refreshVariations();
+      syncUI(); intInput._refresh(); highlight(p.name); render(); refreshVariations(); commitChange();
     });
     grid.appendChild(chip);
   });
@@ -2061,7 +2068,7 @@ function buildVariationsUI(parent){
     cell.appendChild(c); cell.appendChild(label); grid.appendChild(cell);
     cell.addEventListener('click', ()=>{
       const ng = cloneGrade(grade); v.d(ng); grade = ng;
-      syncUI(); render(); refreshVariations();
+      syncUI(); render(); refreshVariations(); commitChange();
     });
     return {v, ctx:c.getContext('2d')};
   });
@@ -2110,6 +2117,7 @@ function buildUI(){
     bakeSrcLUT();                                  // re-bake the source decode
     if(srcImage) srcStats = computeStats(srcImage, colorSpace);
     if(refStats && matchBase){ applyMatch(); } else { render(); refreshVariations(); }
+    commitChange();
   });
   b.appendChild(spaceSel);
   const snote = document.createElement('div'); snote.className = 'curve-hint';
@@ -2271,6 +2279,79 @@ function syncUI(){
   refreshHsl();
   bakeCurves(); redrawCurveEditor();
 }
+
+/* --------------------------------------------------------------------------
+   6b. UNDO / REDO · SAVE / LOAD .json · AUTOSAVE
+   The document state is {grade, colorSpace, title}; cloneGrade() deep-copies
+   the look. Edits funnel through commitChange() (debounced) which pushes a
+   history snapshot and autosaves to localStorage. Undo/redo replay snapshots
+   through applyState(), which pushes state back into every control.
+   -------------------------------------------------------------------------- */
+const AUTOSAVE_KEY = 'meatlut.autosave.v1';
+function snapshot(){ return { grade: cloneGrade(grade), colorSpace, title: exportTitle }; }
+function applyState(s){
+  if(!s || !s.grade) return;
+  grade = cloneGrade(s.grade);
+  colorSpace = s.colorSpace | 0;
+  if(typeof s.title === 'string'){ exportTitle = s.title;
+    const ti = document.querySelector('.lut-title'); if(ti) ti.value = exportTitle; }
+  const ss = document.querySelector('.space-select'); if(ss) ss.value = colorSpace;
+  bakeSrcLUT();
+  if(srcImage) srcStats = computeStats(srcImage, colorSpace);
+  syncUI();
+  render(); refreshVariations();
+}
+
+let history = [], hIndex = -1, applyingState = false, histTimer = null, autoTimer = null;
+function histInit(){ history = [snapshot()]; hIndex = 0; updateUndoUI(); }
+function pushHistory(){
+  if(applyingState) return;
+  const snap = snapshot();
+  if(hIndex >= 0 && JSON.stringify(snap) === JSON.stringify(history[hIndex])) return;
+  history = history.slice(0, hIndex + 1);
+  history.push(snap); hIndex = history.length - 1;
+  if(history.length > 120){ history.shift(); hIndex--; }
+  updateUndoUI();
+}
+function commitChange(){
+  if(applyingState) return;
+  clearTimeout(histTimer); histTimer = setTimeout(pushHistory, 350);
+  scheduleAutosave();
+}
+function scheduleAutosave(){
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(()=>{ try{ localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snapshot())); }catch(e){} }, 600);
+}
+function undo(){ if(hIndex <= 0) return; hIndex--; applyingState = true; applyState(history[hIndex]); applyingState = false; updateUndoUI(); scheduleAutosave(); }
+function redo(){ if(hIndex >= history.length - 1) return; hIndex++; applyingState = true; applyState(history[hIndex]); applyingState = false; updateUndoUI(); scheduleAutosave(); }
+function updateUndoUI(){
+  const u = document.getElementById('btnUndo'), r = document.getElementById('btnRedo');
+  if(u) u.disabled = hIndex <= 0;
+  if(r) r.disabled = hIndex >= history.length - 1;
+}
+function restoreAutosave(){
+  let doc = null; try{ doc = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); }catch(e){}
+  if(doc && doc.grade){ applyingState = true; applyState(doc); applyingState = false;
+    setStatus('Restored your last session — Reset Grade to start fresh'); }
+}
+function saveProject(){
+  const doc = Object.assign({ app:'meatlut', version:1, savedAt:new Date().toISOString() }, snapshot());
+  downloadBlob(sanitizeName(exportTitle || 'look') + '.meatlut.json',
+    new Blob([JSON.stringify(doc, null, 2)], {type:'application/json'}));
+  setStatus('Saved ' + (exportTitle || 'look') + '.meatlut.json');
+}
+function loadProject(file){
+  const r = new FileReader();
+  r.onload = ()=>{ try{
+      const doc = JSON.parse(r.result);
+      if(!doc || !doc.grade) throw new Error('bad');
+      applyState(doc); pushHistory(); scheduleAutosave();
+      setStatus('Loaded ' + file.name);
+    }catch(e){ setStatus('Not a valid MEAT LUT .json look file'); }
+  };
+  r.readAsText(file);
+}
+function setStatus(msg){ const el = document.getElementById('statusText'); if(el) el.textContent = msg; }
 
 /* --------------------------------------------------------------------------
    7. SPLIT SLIDER (drag the divider)
@@ -2511,11 +2592,26 @@ document.getElementById('btnReset').addEventListener('click', ()=>{
   resetPresetUI();      // clear active film-stock selection
   resetMatchUI();       // clear the loaded reference match
   syncUI();             // refresh every input (sliders, wheels, HSL, curves)
-  render(); refreshVariations();
+  render(); refreshVariations(); commitChange();
 });
 
 document.getElementById('btnExport').addEventListener('click', ()=>{
   exportCube(exportSize, exportTitle);
+});
+
+// Undo / redo + project save / load
+document.getElementById('btnUndo').addEventListener('click', undo);
+document.getElementById('btnRedo').addEventListener('click', redo);
+document.getElementById('btnSaveProj').addEventListener('click', saveProject);
+const projInput = document.getElementById('projInput');
+document.getElementById('btnOpenProj').addEventListener('click', ()=> projInput.click());
+projInput.addEventListener('change', e=>{ if(e.target.files[0]) loadProject(e.target.files[0]); projInput.value=''; });
+window.addEventListener('keydown', e=>{
+  const t = e.target, tag = (t.tagName||'').toLowerCase();
+  if(tag === 'textarea' || (tag === 'input' && t.type === 'text')) return;  // let text fields keep native undo
+  const k = e.key.toLowerCase();
+  if((e.ctrlKey || e.metaKey) && k === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if((e.ctrlKey || e.metaKey) && k === 'y'){ e.preventDefault(); redo(); }
 });
 
 /* --------------------------------------------------------------------------
@@ -2536,6 +2632,8 @@ function init(){
   positionHandle();
   scopesTick();                      // start the scopes refresh loop
   document.getElementById('statusText').textContent = 'WebGL2 ready — all phases ✓';
+  restoreAutosave();                 // bring back the last session's grade (if any)
+  histInit();                        // seed undo history with the current state
 }
 init();
 </script>
