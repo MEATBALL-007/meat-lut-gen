@@ -2178,6 +2178,7 @@ function renderFilmstrip(){
    The current frame becomes the live source texture; grading, scopes, export
    all work on it. Exotic codecs (ProRes/RAW/MXF) can't decode in-browser. */
 let currentVideo = null;
+let videoGen = 0;       // bumped per load so stale rAF loops exit (no pile-up)
 const videoBar = document.getElementById('videoBar');
 const vPlay = document.getElementById('vPlay');
 const vSeek = document.getElementById('vSeek');
@@ -2191,14 +2192,14 @@ function uploadVideoFrame(){
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, currentVideo);
   render();
 }
-function videoTick(){
-  if(!currentVideo) return;                       // self-stops when cleared
+function videoTick(gen){
+  if(gen !== videoGen || !currentVideo) return;   // stale/cleared loop exits
   if(!currentVideo.paused && !currentVideo.ended){
     uploadVideoFrame();
     if(currentVideo.duration) vSeek.value = (currentVideo.currentTime/currentVideo.duration)*1000;
     vTime.textContent = fmtTime(currentVideo.currentTime)+' / '+fmtTime(currentVideo.duration);
   }
-  requestAnimationFrame(videoTick);
+  requestAnimationFrame(()=> videoTick(gen));
 }
 function clearVideoEl(){
   if(currentVideo){ currentVideo.pause(); try{ URL.revokeObjectURL(currentVideo.src); }catch(e){} currentVideo = null; }
@@ -2213,6 +2214,7 @@ function loadVideo(file){
 }
 function setVideoSource(v, name){
   stopMotion(); clearVideoEl();
+  const gen = ++videoGen;                          // invalidate any prior loop
   currentVideo = v; activeImageIndex = -1; srcImage = v;
   filmstripEl.classList.add('empty');             // hide stills strip while video active
   canvas.width = v.videoWidth; canvas.height = v.videoHeight;
@@ -2226,7 +2228,7 @@ function setVideoSource(v, name){
   v.addEventListener('seeked', ()=>{ uploadVideoFrame(); srcStats = computeStats(v, colorSpace);
     if(refStats && matchBase) applyMatch(); });
   setStatus('Video loaded — ' + v.videoWidth + '×' + v.videoHeight);
-  videoTick();
+  videoTick(gen);
 }
 vPlay.addEventListener('click', ()=>{
   if(!currentVideo) return;
