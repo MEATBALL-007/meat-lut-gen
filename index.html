@@ -82,6 +82,9 @@ button.btn.primary{ background:var(--accent); border-color:var(--accent); color:
 button.btn.primary:hover{ filter:brightness(1.08); }
 button.btn.ghost{ background:transparent; }
 button.btn.icon{ padding:7px 10px; font-size:15px; line-height:1; }
+#viewSel{ font-family:var(--font-ui); font-weight:600; font-size:12px; color:var(--text);
+  background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:7px 8px; cursor:pointer; }
+#viewSel:hover{ border-color:var(--accent); }
 button.btn:disabled{ opacity:.4; cursor:default; border-color:var(--line); color:var(--text); }
 
 /* ----------------------------------------------------------------------------
@@ -497,7 +500,13 @@ footer .dot{ color:var(--ok); }
   </div>
   <button class="btn ghost icon" id="btnUndo" title="Undo (Ctrl/⌘+Z)" disabled>↶</button>
   <button class="btn ghost icon" id="btnRedo" title="Redo (Ctrl/⌘+Shift+Z)" disabled>↷</button>
-  <button class="btn" id="btnSplit">Split: On</button>
+  <select id="viewSel" title="Preview mode">
+    <option value="0">After</option>
+    <option value="1">Before</option>
+    <option value="2" selected>Wipe</option>
+    <option value="3">Difference</option>
+    <option value="4">Side-by-side</option>
+  </select>
   <button class="btn ghost" id="btnReset">Reset Grade</button>
   <button class="btn ghost" id="btnSaveProj" title="Save look as .json">Save</button>
   <button class="btn ghost" id="btnOpenProj" title="Open a .json look">Open</button>
@@ -619,7 +628,7 @@ function defaultGrade(){
 let grade = defaultGrade();
 
 /* UI state (not part of the exported look) */
-let splitOn   = true;   // before/after compare active?
+let viewMode  = 2;      // preview: 0 after · 1 before · 2 wipe · 3 difference · 4 side-by-side
 let splitPos  = 0.5;    // 0..1 divider position
 let activeBand = 0;     // which HSL band the sliders currently edit
 let activeCurve = 'rgb';// which tone curve the editor currently edits
@@ -857,7 +866,7 @@ out vec4 fragColor;
 uniform sampler2D uImage;
 uniform sampler2D uCurveLUT; // 256x1 baked tone curves (R/G/B in .rgb, master in .a)
 uniform float uSplit;       // divider position 0..1
-uniform bool  uShowSplit;   // before/after compare on?
+uniform int   uViewMode;    // 0 after · 1 before · 2 wipe · 3 difference · 4 side-by-side
 
 /* White balance */
 uniform float uTemp, uTint;
@@ -1068,8 +1077,19 @@ void main(){
   vec3 orig   = texture(uImage, vUv).rgb;
   vec3 graded = applyGrade(orig);
 
-  // Left of the divider = original (before), right = graded (after).
-  vec3 outc = (uShowSplit && vUv.x < uSplit) ? orig : graded;
+  vec3 outc;
+  if(uViewMode == 1){                       // before only
+    outc = orig;
+  } else if(uViewMode == 2){                // wipe: left = before, right = after
+    outc = (vUv.x < uSplit) ? orig : graded;
+  } else if(uViewMode == 3){                // difference (amplified)
+    outc = clamp(abs(graded - orig) * 4.0, 0.0, 1.0);
+  } else if(uViewMode == 4){                // side-by-side: whole frame in each half
+    if(vUv.x < 0.5) outc = texture(uImage, vec2(vUv.x*2.0, vUv.y)).rgb;
+    else            outc = applyGrade(texture(uImage, vec2((vUv.x-0.5)*2.0, vUv.y)).rgb);
+  } else {                                  // 0 = after
+    outc = graded;
+  }
   fragColor = vec4(clamp(outc, 0.0, 1.0), 1.0);
 }`;
 
@@ -1097,7 +1117,7 @@ function buildProgram(){
   gl.useProgram(program);
 
   // Cache every uniform location we will set each frame.
-  const names = ['uImage','uCurveLUT','uSplit','uShowSplit','uTemp','uTint','uExposure',
+  const names = ['uImage','uCurveLUT','uSplit','uViewMode','uTemp','uTint','uExposure',
     'uContrast','uHighlights','uShadows','uWhites','uBlacks',
     'uLift','uGamma','uGain','uSaturation','uVibrance',
     'uHslHue[0]','uHslSat[0]','uHslLum[0]',
@@ -1252,7 +1272,7 @@ function render(){
   gl.uniform1i(uniforms['uSrcLUT'], 3);
 
   gl.uniform1f(uniforms['uSplit'], splitPos);
-  gl.uniform1i(uniforms['uShowSplit'], splitOn ? 1 : 0);
+  gl.uniform1i(uniforms['uViewMode'], viewMode);
   gl.uniform1i(uniforms['uBake'], 0);
   setGradeUniforms();
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -1289,7 +1309,7 @@ function bakeLUT(S){
   gl.bindTexture(gl.TEXTURE_2D, srcTex);
   gl.uniform1i(uniforms['uSrcLUT'], 3);
   setGradeUniforms();
-  gl.uniform1i(uniforms['uShowSplit'], 0);
+  gl.uniform1i(uniforms['uViewMode'], 0);
   gl.uniform1i(uniforms['uBake'], 1);
   gl.uniform1f(uniforms['uLutSize'], S);
   gl.uniform1f(uniforms['uTilesPerRow'], cols);
@@ -1359,12 +1379,12 @@ function buildCoverCanvas(){
   const W = 1600, H = 900;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const x = cv.getContext('2d');
-  const savedSplit = splitOn; splitOn = false; render();   // full graded frame
+  const savedVM = viewMode; viewMode = 0; render();   // full graded frame
   drawCover(x, canvas, W, H);
   x.save(); x.beginPath(); x.rect(0,0,W/2,H); x.clip();
   if(src) drawCover(x, src, W, H);                          // original on the left
   x.restore();
-  splitOn = savedSplit; render();
+  viewMode = savedVM; render();
   x.fillStyle = 'rgba(255,255,255,.92)'; x.fillRect(W/2-1, 0, 2, H);  // divider
   const label = (text, align, fg)=>{
     x.font = '700 20px "JetBrains Mono", monospace';
@@ -2182,15 +2202,15 @@ function buildVariationsUI(parent){
   // Render every variation thumbnail off the current grade (full, not split).
   refreshVariations = ()=>{
     if(!program) return;
-    const savedGrade = grade, savedSplit = splitOn;
-    splitOn = false;
+    const savedGrade = grade, savedVM = viewMode;
+    viewMode = 0;
     for(const cell of cells){
       grade = cloneGrade(savedGrade); cell.v.d(grade);
       render();
       cell.ctx.clearRect(0,0,90,60);
       drawCover(cell.ctx, canvas, 90, 60);
     }
-    grade = savedGrade; splitOn = savedSplit; render();
+    grade = savedGrade; viewMode = savedVM; render();
   };
 }
 
@@ -2684,13 +2704,21 @@ window.addEventListener('drop', e=>{
   if(e.dataTransfer.files.length) addImages(e.dataTransfer.files);
 });
 
-document.getElementById('btnSplit').addEventListener('click', e=>{
-  splitOn = !splitOn;
-  e.target.textContent = 'Split: ' + (splitOn ? 'On':'Off');
-  handle.style.display = splitOn ? 'flex':'none';
-  document.getElementById('beforeLabel').style.display = splitOn?'block':'none';
-  document.getElementById('afterLabel').style.display  = splitOn?'block':'none';
+function setViewMode(m){
+  viewMode = m;
+  const vs = document.getElementById('viewSel'); if(vs) vs.value = String(m);
+  handle.style.display = (m === 2) ? 'flex' : 'none';            // wipe divider
+  const showLabels = (m === 2 || m === 4);
+  document.getElementById('beforeLabel').style.display = showLabels ? 'block':'none';
+  document.getElementById('afterLabel').style.display  = showLabels ? 'block':'none';
   render();
+}
+document.getElementById('viewSel').addEventListener('change', e=> setViewMode(parseInt(e.target.value, 10)));
+// `\` quickly toggles full Before / After
+window.addEventListener('keydown', e=>{
+  const tag = (e.target.tagName||'').toLowerCase();
+  if(tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if(e.key === '\\'){ e.preventDefault(); setViewMode(viewMode === 1 ? 0 : 1); }
 });
 
 document.getElementById('btnReset').addEventListener('click', ()=>{

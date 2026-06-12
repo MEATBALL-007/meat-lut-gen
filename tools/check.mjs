@@ -60,6 +60,7 @@ for(const [name, pat] of [
   ['LUT bake','bakeLUT'], ['.cube export','lutToCube'], ['HALD export','exportHald'],
   ['zip pack','makeZip'], ['cover image','buildCoverCanvas'], ['scopes','scopesDraw'],
   ['waveform','drawWaveform'], ['rgb parade','drawParade'], ['vectorscope','drawVectorscope'],
+  ['preview modes','setViewMode'],
   ['workspace panels','layoutPanels'], ['panel drag','makeDraggable'], ['layout save','saveLayout'],
   ['drag-drop overlay','dropOverlay'],
   ['undo/redo history','pushHistory'], ['apply snapshot','applyState'], ['mobile layout','isNarrow'],
