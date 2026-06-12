@@ -106,5 +106,8 @@ Helper ที่มีให้ใช้:
 
 ## การทดสอบ
 - ไม่มี build step — เปิด `index.html` ในเบราว์เซอร์ที่รองรับ WebGL2
-- เช็ค JS syntax ได้ด้วย `node --check` (ดึงเนื้อหาใน `<script>` ออกมาทดสอบ)
+- **`node tools/check.mjs`** — รัน regression checks แบบไม่ต้องมีเบราว์เซอร์:
+  JS syntax, ความสอดคล้องของ shader uniforms, feature hooks, และ unit test ของ
+  logic บริสุทธิ์ (spline, reference-match mapping, RAW JPEG scan, decode).
+  รันอัตโนมัติใน CI (`.github/workflows/ci.yml`) ทุก push/PR
 - สภาพแวดล้อม dev นี้ **ไม่มี GLSL validator** → ต้องรีวิว shader ด้วยตาให้ละเอียด

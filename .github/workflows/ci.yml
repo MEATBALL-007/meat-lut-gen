@@ -1,0 +1,21 @@
+name: CI
+
+# Browser-free regression checks: JS syntax, shader-uniform consistency, feature
+# hooks, and unit tests of the pure logic (tools/check.mjs).
+on:
+  push:
+    branches:
+      - main
+      - claude/hopeful-pasteur-mbs8qx
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tools/check.mjs
