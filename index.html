@@ -393,6 +393,27 @@ input[type=range]::-moz-range-thumb{
   border:1px solid var(--line); background:#111; image-rendering:pixelated;
 }
 
+/* Media & Looks library */
+.lib-head{ display:flex; align-items:center; justify-content:space-between;
+  font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--text-dim);
+  text-transform:uppercase; margin-bottom:6px; }
+.lib-btn{ font-family:var(--font-ui); font-size:11px; font-weight:600; color:var(--text);
+  background:var(--surface-2); border:1px solid var(--line); border-radius:5px;
+  padding:4px 8px; cursor:pointer; }
+.lib-btn:hover{ border-color:var(--accent); color:#fff; }
+.lib-btn.sm{ padding:2px 7px; }
+.lib-list{ display:flex; flex-direction:column; gap:4px; }
+.lib-empty{ font-size:11px; color:var(--text-dim); padding:4px 2px; font-style:italic; }
+.lib-row{ display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:6px;
+  background:var(--surface-2); cursor:pointer; }
+.lib-row:hover{ background:var(--line); }
+.lib-row.active{ outline:1px solid var(--accent); }
+.lib-thumb{ width:40px; height:26px; border-radius:3px; flex:0 0 auto; }
+.lib-name{ flex:1; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lib-x{ flex:0 0 auto; border:none; background:none; color:var(--text-dim); cursor:pointer;
+  font-size:12px; padding:2px 4px; border-radius:4px; }
+.lib-x:hover{ color:#fff; background:rgba(255,80,80,.3); }
+
 /* Filmstrip (multi-image + motion preview) */
 .filmstrip{
   position:absolute; left:50%; transform:translateX(-50%); bottom:14px;
@@ -2162,6 +2183,63 @@ function buildScopesUI(parent){
 function scopesTick(){ if(scopesDirty){ scopesDirty = false; scopesDraw(); } requestAnimationFrame(scopesTick); }
 
 /* --------------------------------------------------------------------------
+   MEDIA & LOOKS LIBRARY
+   Media = the stills/video loaded this session (reuses images[]/setActiveImage).
+   Looks = named grades persisted in localStorage; apply one to any image. This
+   is the local foundation for cloud sync (cross-device needs a backend).
+   -------------------------------------------------------------------------- */
+const LOOKS_KEY = 'meatlut.looks.v1';
+function getLooks(){ try{ return JSON.parse(localStorage.getItem(LOOKS_KEY) || '[]'); }catch(e){ return []; } }
+function putLooks(a){ try{ localStorage.setItem(LOOKS_KEY, JSON.stringify(a)); }catch(e){} }
+let renderLibrary = ()=>{};
+function buildLibraryUI(parent){
+  const mHead = document.createElement('div'); mHead.className = 'lib-head'; mHead.innerHTML = '<span>Media</span>';
+  const addBtn = document.createElement('button'); addBtn.className = 'lib-btn'; addBtn.textContent = '＋ Add';
+  addBtn.addEventListener('click', ()=> document.getElementById('fileInput').click());
+  mHead.appendChild(addBtn); parent.appendChild(mHead);
+  const mediaList = document.createElement('div'); mediaList.className = 'lib-list'; parent.appendChild(mediaList);
+
+  const lHead = document.createElement('div'); lHead.className = 'lib-head'; lHead.style.marginTop = '12px';
+  lHead.innerHTML = '<span>Saved looks</span>';
+  const saveBtn = document.createElement('button'); saveBtn.className = 'lib-btn'; saveBtn.textContent = '＋ Save current';
+  saveBtn.addEventListener('click', ()=>{
+    const n = (prompt('Name this look:', exportTitle || 'Look') || '').trim(); if(!n) return;
+    const arr = getLooks(); arr.unshift(Object.assign({ id:Date.now(), name:n }, snapshot()));
+    putLooks(arr); renderLibrary(); setStatus('Saved look “' + n + '”');
+  });
+  lHead.appendChild(saveBtn); parent.appendChild(lHead);
+  const looksList = document.createElement('div'); looksList.className = 'lib-list'; parent.appendChild(looksList);
+
+  renderLibrary = ()=>{
+    mediaList.innerHTML = '';
+    if(currentVideo){ const r = document.createElement('div'); r.className = 'lib-row active';
+      r.innerHTML = '<span class="lib-name">🎞 video (active)</span>'; mediaList.appendChild(r); }
+    if(!images.length && !currentVideo) mediaList.innerHTML = '<div class="lib-empty">No media loaded</div>';
+    images.forEach((im,i)=>{
+      const row = document.createElement('div'); row.className = 'lib-row' + (i===activeImageIndex ? ' active' : '');
+      const c = document.createElement('canvas'); c.width = 40; c.height = 26; c.className = 'lib-thumb';
+      drawCover(c.getContext('2d'), im.img, 40, 26);
+      const nm = document.createElement('span'); nm.className = 'lib-name'; nm.textContent = im.name;
+      const del = document.createElement('button'); del.className = 'lib-x'; del.textContent = '✕';
+      del.addEventListener('click', e=>{ e.stopPropagation(); removeImage(i); });
+      row.append(c, nm, del); row.addEventListener('click', ()=> setActiveImage(i)); mediaList.appendChild(row);
+    });
+    const looks = getLooks(); looksList.innerHTML = '';
+    if(!looks.length) looksList.innerHTML = '<div class="lib-empty">No saved looks yet</div>';
+    looks.forEach(l=>{
+      const row = document.createElement('div'); row.className = 'lib-row';
+      const nm = document.createElement('span'); nm.className = 'lib-name'; nm.textContent = l.name;
+      const ap = document.createElement('button'); ap.className = 'lib-btn sm'; ap.textContent = 'Apply';
+      ap.addEventListener('click', e=>{ e.stopPropagation(); applyState(l); pushHistory(); setStatus('Applied “' + l.name + '”'); });
+      const del = document.createElement('button'); del.className = 'lib-x'; del.textContent = '✕';
+      del.addEventListener('click', e=>{ e.stopPropagation(); putLooks(getLooks().filter(x=>x.id!==l.id)); renderLibrary(); });
+      row.append(nm, ap, del); looksList.appendChild(row);
+    });
+  };
+  renderLibrary();
+}
+
+/* --------------------------------------------------------------------------
    AUTO VARIATIONS (Phase 6)
    Each variation is a small delta applied on top of the CURRENT grade. We
    render the current image through each variant into a thumbnail; clicking a
@@ -2255,6 +2333,10 @@ function buildUI(){
   /* --- Scopes (Phase 9) --- */
   b = addSection('Scopes');
   buildScopesUI(b);
+
+  /* --- Media & Looks library --- */
+  b = addSection('Library — Media & Looks');
+  buildLibraryUI(b);
 
   /* --- White Balance --- */
   b = addSection('White Balance', true);
@@ -2618,6 +2700,7 @@ function renderFilmstrip(){
     t.addEventListener('click', ()=> setActiveImage(i));
     filmstripEl.appendChild(t);
   });
+  renderLibrary();          // keep the Library panel's media list in sync
 }
 
 /* ---- Video footage (browser-native codecs: MP4/H.264, WebM, MOV, Ogg) ------
@@ -2665,6 +2748,7 @@ function setVideoSource(v, name){
   const gen = ++videoGen;                          // invalidate any prior loop
   currentVideo = v; activeImageIndex = -1; srcImage = v;
   filmstripEl.classList.add('empty');             // hide stills strip while video active
+  renderLibrary();
   canvas.width = v.videoWidth; canvas.height = v.videoHeight;
   gl.viewport(0,0,canvas.width, canvas.height);
   document.getElementById('resText').textContent = v.videoWidth+' × '+v.videoHeight;
