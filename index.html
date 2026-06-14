@@ -505,19 +505,38 @@ footer .dot{ color:var(--ok); }
   header{ flex-wrap:wrap; gap:8px; padding:8px 12px; }
   header .brand{ flex:1 1 100%; }
   header .spacer{ display:none; }
-  header .btn{ padding:7px 10px; font-size:12px; }
+  header .btn{ padding:8px 11px; font-size:12px; min-height:38px; }
+  #viewSel{ min-height:38px; }
 
   main{ flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-  .preview-pane{ flex:0 0 auto; height:40vh; padding:10px; }
+  /* DOM order is [leftDock][preview][rightDock]; on mobile reorder so the image
+     is on top, then the grade controls (right), then Input/Scopes/Library (left) */
+  .preview-pane{ order:-1; position:sticky; top:0; z-index:6; flex:0 0 auto; height:36vh; padding:8px;
+    background:#141414; border-bottom:1px solid var(--line); }
+  #dockRight{ order:1; }
+  #dockLeft{ order:2; }
+  #glcanvas{ max-height:calc(36vh - 16px); }
+
   .dock{ width:auto !important; max-width:none; overflow:visible; border:none !important;
-    border-top:1px solid var(--line) !important; }
+    border-top:1px solid var(--line) !important; padding:8px 8px 16px; }
   .dock-resizer{ display:none; }
-  .frame-tabs{ flex-wrap:nowrap; overflow-x:auto; }
+
+  /* tabs: wrap so all are visible, and big enough to tap */
+  .frame-tabs{ flex-wrap:wrap; gap:5px; padding:7px; }
+  .tab{ touch-action:auto; padding:9px 13px; font-size:13px; }
   .frame-body{ max-height:none; }
-  .tab{ touch-action:auto; }        /* let the tab bar scroll under a finger */
+
+  /* fatter drag targets for fingers */
+  input[type=range]{ height:6px; }
+  input[type=range]::-webkit-slider-thumb{ width:22px; height:22px; }
+  input[type=range]::-moz-range-thumb{ width:22px; height:22px; }
+  .wheels{ gap:6px; }
+  .wheel{ width:96px; height:96px; }
+  .wheel .knob{ width:16px; height:16px; }
 }
 @media (max-width: 760px) and (orientation:landscape){
-  .preview-pane{ height:62vh; }
+  .preview-pane{ height:58vh; }
+  #glcanvas{ max-height:calc(58vh - 16px); }
 }
 </style>
 </head>
