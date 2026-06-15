@@ -67,6 +67,7 @@ for(const [name, pat] of [
   ['dock resize','enableDockResize'], ['layout save','saveLayout'],
   ['drag-drop overlay','dropOverlay'],
   ['undo/redo history','pushHistory'], ['apply snapshot','applyState'], ['mobile layout','isNarrow'],
+  ['history panel','buildHistoryUI'], ['history jump','historyJump'], ['history labels','historyLabel'],
   ['project save','saveProject'], ['project load','loadProject'], ['autosave','scheduleAutosave'],
 ]) assert(js.includes(pat), `${name} (${pat})`);
 

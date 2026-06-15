@@ -431,6 +431,20 @@ input[type=range]::-moz-range-thumb{
   font-size:12px; padding:2px 4px; border-radius:4px; }
 .lib-x:hover{ color:#fff; background:rgba(255,80,80,.3); }
 
+/* History panel */
+.hist-list{ display:flex; flex-direction:column; gap:2px; max-height:46vh; overflow-y:auto; }
+.hist-row{ display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:5px;
+  font-size:12px; cursor:pointer; color:var(--text); }
+.hist-row:hover{ background:var(--surface-2); }
+.hist-row.active{ background:var(--accent); color:#08130d; font-weight:700; }
+.hist-row.future{ opacity:.42; }                 /* redoable (after current) states */
+.hist-i{ flex:0 0 auto; width:18px; text-align:right; font-family:var(--font-mono);
+  font-size:10px; color:var(--text-dim); }
+.hist-row.active .hist-i{ color:#08130d; }
+.hist-label{ flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hist-time{ flex:0 0 auto; font-family:var(--font-mono); font-size:10px; color:var(--text-dim); }
+.hist-row.active .hist-time{ color:#0a1f14; }
+
 .gamut-row{ display:flex; align-items:center; gap:7px; margin-top:9px; font-size:12px;
   cursor:pointer; user-select:none; }
 .gamut-row .gamut-name{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim); }
@@ -1710,7 +1724,7 @@ let frameSeq = 0;
 const DEFAULT_LAYOUT = {
   left: [
     ['Film Stock','Reference Match','Input — Source / Camera Log'],
-    ['Scopes','Library — Media & Looks'],
+    ['Scopes','Library — Media & Looks','History'],
   ],
   right: [
     ['White Balance','Tone','3-Way Color (Lift / Gamma / Gain)','Tone Curve'],
@@ -2418,6 +2432,39 @@ function buildScopesUI(parent){
 function scopesTick(){ if(scopesDirty){ scopesDirty = false; scopesDraw(); } requestAnimationFrame(scopesTick); }
 
 /* --------------------------------------------------------------------------
+   HISTORY PANEL (Photoshop-style)
+   A clickable list of every state in `history`; click one to jump straight to
+   it. Future (redoable) states show dimmed. Re-rendered from updateUndoUI().
+   -------------------------------------------------------------------------- */
+let renderHistory = ()=>{};
+function histTimeStr(t){ try{ return new Date(t).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }catch(e){ return ''; } }
+function buildHistoryUI(parent){
+  const list = document.createElement('div'); list.className = 'hist-list'; parent.appendChild(list);
+  const clear = document.createElement('button'); clear.className = 'lib-btn'; clear.textContent = 'Clear history';
+  clear.style.marginTop = '8px';
+  clear.addEventListener('click', ()=>{ if(!history.length) return; history = [history[hIndex]]; hIndex = 0; updateUndoUI(); });
+  parent.appendChild(clear);
+
+  renderHistory = ()=>{
+    list.innerHTML = '';
+    if(!history.length){ list.innerHTML = '<div class="lib-empty">No history yet</div>'; return; }
+    history.forEach((h, i)=>{
+      const row = document.createElement('div');
+      row.className = 'hist-row' + (i === hIndex ? ' active' : '') + (i > hIndex ? ' future' : '');
+      const idx = document.createElement('span'); idx.className = 'hist-i'; idx.textContent = i;
+      const lab = document.createElement('span'); lab.className = 'hist-label'; lab.textContent = h.label;
+      const tm  = document.createElement('span'); tm.className  = 'hist-time';  tm.textContent  = histTimeStr(h.t);
+      row.append(idx, lab, tm);
+      row.title = h.label + ' · ' + histTimeStr(h.t);
+      row.addEventListener('click', ()=> historyJump(i));
+      list.appendChild(row);
+    });
+    const act = list.querySelector('.hist-row.active'); if(act) act.scrollIntoView({ block:'nearest' });
+  };
+  renderHistory();
+}
+
+/* --------------------------------------------------------------------------
    MEDIA & LOOKS LIBRARY
    Media = the stills/video loaded this session (reuses images[]/setActiveImage).
    Looks = named grades persisted in localStorage; apply one to any image. This
@@ -2586,6 +2633,10 @@ function buildUI(){
   /* --- Media & Looks library --- */
   b = addSection('Library — Media & Looks');
   buildLibraryUI(b);
+
+  /* --- Edit history --- */
+  b = addSection('History');
+  buildHistoryUI(b);
 
   /* --- White Balance --- */
   b = addSection('White Balance', true);
@@ -2760,13 +2811,37 @@ function applyState(s){
 }
 
 let history = [], hIndex = -1, applyingState = false, histTimer = null, autoTimer = null;
-function histInit(){ history = [snapshot()]; hIndex = 0; updateUndoUI(); }
+const DEFAULT_GRADE_STR = JSON.stringify(defaultGrade());
+// Name a history step by diffing the new snapshot against the previous one.
+function historyLabel(prev, next){
+  if(!prev) return 'Open';
+  if(prev.colorSpace !== next.colorSpace) return 'Source space';
+  if(prev.title !== next.title) return 'Rename';
+  if(JSON.stringify(next.grade) === DEFAULT_GRADE_STR && JSON.stringify(prev.grade) !== DEFAULT_GRADE_STR) return 'Reset grade';
+  const a = prev.grade, b = next.grade, changed = [];
+  const SCALAR = { temp:'Temperature', tint:'Tint', exposure:'Exposure', contrast:'Contrast',
+    highlights:'Highlights', shadows:'Shadows', whites:'Whites', blacks:'Blacks',
+    saturation:'Saturation', vibrance:'Vibrance', fade:'Faded black', fadeRolloff:'Faded black' };
+  for(const k in SCALAR){ if(a[k] !== b[k]) changed.push(SCALAR[k]); }
+  const j = (x,y)=> JSON.stringify(x) !== JSON.stringify(y);
+  if(j(a.lift,b.lift) || j(a.gamma,b.gamma) || j(a.gain,b.gain)) changed.push('3-Way color');
+  if(j(a.curves,b.curves)) changed.push('Tone curve');
+  if(j(a.hsl,b.hsl)) changed.push('HSL');
+  if(j(a.split,b.split)) changed.push('Split toning');
+  if(j(a.match,b.match)) changed.push('Reference match');
+  const uniq = [...new Set(changed)];
+  return uniq.length === 0 ? 'Adjustment' : uniq.length === 1 ? uniq[0] : 'Multiple edits';
+}
+function histInit(){ history = [{ s: snapshot(), label:'Open', t: Date.now() }]; hIndex = 0; updateUndoUI(); }
 function pushHistory(){
   if(applyingState) return;
   const snap = snapshot();
-  if(hIndex >= 0 && JSON.stringify(snap) === JSON.stringify(history[hIndex])) return;
+  const prev = hIndex >= 0 ? history[hIndex] : null;
+  if(prev && JSON.stringify(snap) === JSON.stringify(prev.s)) return;
+  const label = historyLabel(prev ? prev.s : null, snap);
   history = history.slice(0, hIndex + 1);
-  history.push(snap); hIndex = history.length - 1;
+  history.push({ s: snap, label, t: Date.now() });
+  hIndex = history.length - 1;
   if(history.length > 120){ history.shift(); hIndex--; }
   updateUndoUI();
 }
@@ -2779,12 +2854,17 @@ function scheduleAutosave(){
   clearTimeout(autoTimer);
   autoTimer = setTimeout(()=>{ try{ localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snapshot())); }catch(e){} }, 600);
 }
-function undo(){ if(hIndex <= 0) return; hIndex--; applyingState = true; applyState(history[hIndex]); applyingState = false; updateUndoUI(); scheduleAutosave(); }
-function redo(){ if(hIndex >= history.length - 1) return; hIndex++; applyingState = true; applyState(history[hIndex]); applyingState = false; updateUndoUI(); scheduleAutosave(); }
+function undo(){ if(hIndex <= 0) return; hIndex--; applyingState = true; applyState(history[hIndex].s); applyingState = false; updateUndoUI(); scheduleAutosave(); }
+function redo(){ if(hIndex >= history.length - 1) return; hIndex++; applyingState = true; applyState(history[hIndex].s); applyingState = false; updateUndoUI(); scheduleAutosave(); }
+function historyJump(i){
+  if(i < 0 || i >= history.length || i === hIndex) return;
+  hIndex = i; applyingState = true; applyState(history[hIndex].s); applyingState = false; updateUndoUI(); scheduleAutosave();
+}
 function updateUndoUI(){
   const u = document.getElementById('btnUndo'), r = document.getElementById('btnRedo');
   if(u) u.disabled = hIndex <= 0;
   if(r) r.disabled = hIndex >= history.length - 1;
+  renderHistory();
 }
 function restoreAutosave(){
   let doc = null; try{ doc = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); }catch(e){}

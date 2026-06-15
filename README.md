@@ -175,7 +175,9 @@ scrollable column under the preview.
 
 ## Save your work
 
-Edits are tracked: **Undo / Redo** (buttons or `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z`).
+Edits are tracked: **Undo / Redo** (buttons or `Ctrl/⌘+Z` / `Ctrl/⌘+Shift+Z`). The
+**History** panel lists every state with an auto-named label (e.g. “Exposure”,
+“Tone curve”) — click any entry to jump straight to it (future states show dimmed).
 **Save** downloads the look as a `.meatlut.json` file and **Open** loads one back.
 Your latest state also **autosaves** to `localStorage` and is restored next visit
 (use **Reset Grade** to start fresh).
