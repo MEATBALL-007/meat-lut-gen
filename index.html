@@ -511,11 +511,12 @@ footer{
 footer .dot{ color:var(--ok); }
 
 /* --------------------------------------------------------------------------
-   MOBILE / NARROW WORKSPACE
-   On a phone the docks stack below the preview as full-width tabbed frames and
-   the whole column scrolls; tab bars scroll horizontally. Dock resizers hide.
+   STACKED WORKSPACE — phones AND touch tablets (iPad) up to 1024px
+   Side-by-side docks would crush the preview on a narrow/portrait screen, so the
+   docks stack below the preview as full-width tabbed frames and the column
+   scrolls. Covers iPad portrait (768–1024, coarse pointer) too.
    -------------------------------------------------------------------------- */
-@media (max-width: 760px){
+@media (max-width: 760px), (pointer: coarse) and (max-width: 1024px){
   header{ flex-wrap:wrap; gap:8px; padding:8px 12px; }
   header .brand{ flex:1 1 100%; }
   header .spacer{ display:none; }
@@ -551,6 +552,28 @@ footer .dot{ color:var(--ok); }
 @media (max-width: 760px) and (orientation:landscape){
   .preview-pane{ height:58vh; }
   #glcanvas{ max-height:calc(58vh - 16px); }
+}
+
+/* --------------------------------------------------------------------------
+   TOUCH HIT TARGETS — any finger-driven device (iPad in either orientation,
+   phones). Applies on top of the layout rules so even the desktop side-dock
+   layout on a big iPad gets comfortably tappable controls.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse){
+  .btn, #viewSel{ min-height:42px; }
+  .menu-pop label, .menu-pop .mbtn{ padding:11px 10px; }
+  .tab{ padding:10px 14px; }
+  .tab .tx{ padding:3px 7px; font-size:14px; }
+  .lib-btn{ padding:9px 12px; }
+  .lib-x{ min-width:34px; min-height:34px; display:flex; align-items:center; justify-content:center; }
+  .lib-row, .hist-row{ padding:9px 8px; }
+  input[type=range]{ height:6px; }
+  input[type=range]::-webkit-slider-thumb{ width:26px; height:26px; }
+  input[type=range]::-moz-range-thumb{ width:26px; height:26px; }
+  .wheel .knob{ width:18px; height:18px; }
+  .dock-resizer{ width:14px; }
+  .vbtn{ min-width:42px; min-height:42px; }
+  .vseek{ height:26px; }
 }
 </style>
 </head>
@@ -1712,7 +1735,9 @@ function makeDefaultImage(){
    --------------------------------------------------------------------------- */
 const PANELS = [];
 const LAYOUT_KEY = 'meatlut.layout.v2';
-const isNarrow = ()=> window.matchMedia('(max-width: 760px)').matches;
+// True when the docks are stacked (phones + iPad portrait) — matches the CSS
+// breakpoint, so tab-drag / dock-resize are disabled exactly when docks stack.
+const isNarrow = ()=> window.matchMedia('(max-width: 760px), (pointer: coarse) and (max-width: 1024px)').matches;
 
 const DOCKS = {
   left:  { el: document.getElementById('dockLeft'),  resizer: document.getElementById('resizeLeft'),  frames: [] },
