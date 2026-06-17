@@ -1044,6 +1044,7 @@ uniform float uMatchAmount;
    camera-log / colour-space profile. Rec.709 profile => identity LUT. */
 uniform sampler2D uSrcLUT;
 uniform mat3 uGamutMat;      // camera native gamut -> Rec.709 (linear); identity = off
+uniform bool uGamutOn;       // false = skip the gamut conversion entirely (faster)
 
 const float PI = 3.14159265;
 float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -1057,6 +1058,7 @@ float lin2srgb1(float v){ v = max(v,0.0); return v <= 0.0031308 ? v*12.92 : 1.05
 // (standard spaces / gamut off) makes this an exact no-op.
 vec3 decodeSource(vec3 c){
   vec3 d = vec3(srcAt(c.r), srcAt(c.g), srcAt(c.b));
+  if(!uGamutOn) return d;                       // skip the pow() roundtrip when off/identity
   vec3 lin = uGamutMat * vec3(srgb2lin1(d.r), srgb2lin1(d.g), srgb2lin1(d.b));
   return vec3(lin2srgb1(lin.r), lin2srgb1(lin.g), lin2srgb1(lin.b));
 }
@@ -1283,7 +1285,7 @@ function buildProgram(){
     'uHslHue[0]','uHslSat[0]','uHslLum[0]',
     'uSplitShadowHue','uSplitShadowSat','uSplitHighHue','uSplitHighSat',
     'uSplitBalance','uFade','uFadeRolloff',
-    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uSrcLUT','uGamutMat',
+    'uSrcMean','uSrcStd','uRefMean','uRefStd','uMatchAmount','uSrcLUT','uGamutMat','uGamutOn',
     'uBake','uLutSize','uTilesPerRow'];
   names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
 }
@@ -1300,6 +1302,14 @@ function buildQuad(){
 
 // Texture that holds the current preview image.
 let tex, imgW = 800, imgH = 500;
+// Preview render cap: rendering a 12-megapixel phone photo every frame murders
+// the GPU (esp. on iPad). The LUT bake is resolution-independent, so the live
+// preview only needs enough pixels to judge the look. Cap the long edge.
+const PREVIEW_CAP = window.matchMedia('(pointer: coarse)').matches ? 1280 : 1920;
+function fitPreview(w, h){
+  const s = Math.min(1, PREVIEW_CAP / Math.max(w, h));
+  return [Math.max(1, Math.round(w*s)), Math.max(1, Math.round(h*s))];
+}
 function buildTexture(){
   tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -1367,9 +1377,10 @@ function uploadImage(src){
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
   imgW = src.width; imgH = src.height;
-  canvas.width = imgW; canvas.height = imgH;
-  gl.viewport(0,0,imgW,imgH);
-  document.getElementById('resText').textContent = imgW + ' × ' + imgH;
+  const [cw, ch] = fitPreview(imgW, imgH);
+  canvas.width = cw; canvas.height = ch;
+  gl.viewport(0,0,cw,ch);
+  document.getElementById('resText').textContent = imgW + ' × ' + imgH + (cw < imgW ? '  (preview ' + cw + '×' + ch + ')' : '');
   srcImage = src;
   srcStats = computeStats(src, colorSpace); // for reference look-match
   if(refStats && matchBase){ applyMatch(); }  // re-match this new source
@@ -1382,7 +1393,10 @@ function uploadImage(src){
 // Push the whole grade (and colour space) to the shader. Shared by the live
 // preview and the LUT bake, so an exported .cube matches the preview exactly.
 function setGradeUniforms(){
-  const m = activeGamutMat();          // camera gamut -> Rec.709 (column-major for GL)
+  const prof = SRC_PROFILES[colorSpace];
+  const on = !!(gamutOn && prof && prof.gk !== 'none');   // only pay the cost when it matters
+  gl.uniform1i(uniforms['uGamutOn'], on ? 1 : 0);
+  const m = on ? prof.m : GAMUTS.none;        // camera gamut -> Rec.709 (column-major for GL)
   gl.uniformMatrix3fv(uniforms['uGamutMat'], false, [
     m[0][0], m[1][0], m[2][0],  m[0][1], m[1][1], m[2][1],  m[0][2], m[1][2], m[2][2] ]);
   gl.uniform1f(uniforms['uTemp'], grade.temp);
@@ -2448,13 +2462,23 @@ function buildScopesUI(parent){
 
   const DRAW = [drawHistogram, drawWaveform, drawParade, drawVectorscope];
   scopesDraw = ()=>{
-    if(!canvas.width) return;
+    // Reading back the GL canvas (drawImage + getImageData) stalls the GPU, so
+    // skip entirely when the Scopes tab isn't on screen (offsetParent === null).
+    if(!canvas.width || !cv.offsetParent) return;
     tctx.clearRect(0,0,SW,SH); tctx.drawImage(canvas, 0,0,SW,SH);
     let data; try{ data = tctx.getImageData(0,0,SW,SH).data; }catch(e){ return; }
     DRAW[mode](data);
   };
 }
-function scopesTick(){ if(scopesDirty){ scopesDirty = false; scopesDraw(); } requestAnimationFrame(scopesTick); }
+// Throttle the scope readback to ~15fps so dragging a slider stays smooth.
+let lastScopeT = 0;
+function scopesTick(ts){
+  if(scopesDirty){
+    const now = ts || (performance && performance.now ? performance.now() : Date.now());
+    if(now - lastScopeT >= 66){ scopesDirty = false; lastScopeT = now; scopesDraw(); }
+  }
+  requestAnimationFrame(scopesTick);
+}
 
 /* --------------------------------------------------------------------------
    HISTORY PANEL (Photoshop-style)
@@ -3122,9 +3146,10 @@ function setVideoSource(v, name){
   currentVideo = v; activeImageIndex = -1; srcImage = v;
   filmstripEl.classList.add('empty');             // hide stills strip while video active
   renderLibrary();
-  canvas.width = v.videoWidth; canvas.height = v.videoHeight;
+  { const [cw, ch] = fitPreview(v.videoWidth, v.videoHeight); canvas.width = cw; canvas.height = ch; }
   gl.viewport(0,0,canvas.width, canvas.height);
-  document.getElementById('resText').textContent = v.videoWidth+' × '+v.videoHeight;
+  document.getElementById('resText').textContent = v.videoWidth+' × '+v.videoHeight +
+    (canvas.width < v.videoWidth ? '  (preview '+canvas.width+'×'+canvas.height+')' : '');
   videoBar.style.display = 'flex'; vPlay.textContent = '▶';
   vTime.textContent = '0:00 / '+fmtTime(v.duration);
   uploadVideoFrame();
