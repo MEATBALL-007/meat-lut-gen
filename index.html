@@ -13,261 +13,180 @@
 <style>
 /* ============================================================================
    MEAT LUT — KMUTT THEME TOKENS
-   All colors / fonts live here so the whole app stays on-brand.
    ========================================================================== */
 :root{
-  --bg:        #1A1A1A;   /* app background        */
-  --surface:   #242424;   /* panels / cards        */
-  --surface-2: #2E2E2E;   /* raised elements       */
-  --line:      #383838;   /* borders / dividers    */
-  --accent:    #FA4616;   /* MEAT orange           */
-  --accent-2:  #FFC72C;   /* KMUTT yellow          */
-  --text:      #F5F3EF;   /* primary text          */
-  --text-dim:  #9A968F;   /* secondary text        */
-  --ok:        #4ED39B;   /* success / neutral grade */
-  --font-ui:   'Space Grotesk', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --bg:#1A1A1A; --surface:#242424; --surface-2:#2E2E2E; --line:#383838;
+  --accent:#FA4616; --accent-2:#FFC72C; --text:#F5F3EF; --text-dim:#9A968F;
+  --ok:#4ED39B;
+  --font-ui:'Space Grotesk',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
 }
-
 *{ box-sizing:border-box; }
 html,body{ height:100%; margin:0; }
 body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:var(--font-ui);
-  font-size:14px;
-  -webkit-font-smoothing:antialiased;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
+  background:var(--bg); color:var(--text); font-family:var(--font-ui);
+  font-size:14px; -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; overflow:hidden;
 }
 
-/* ----------------------------------------------------------------------------
-   TOP BAR
-   -------------------------------------------------------------------------- */
+/* ---- Top bar ---- */
 header{
-  display:flex;
-  align-items:center;
-  gap:16px;
-  padding:12px 20px;
-  background:var(--surface);
-  border-bottom:1px solid var(--line);
-  flex:0 0 auto;
+  display:flex; align-items:center; gap:12px; padding:10px 18px;
+  background:var(--surface); border-bottom:1px solid var(--line); flex:0 0 auto;
+  flex-wrap:wrap;
 }
 .brand{ display:flex; align-items:baseline; gap:10px; }
-.brand .mark{
-  font-weight:700; font-size:20px; letter-spacing:1px;
-  color:var(--text);
-}
+.brand .mark{ font-weight:700; font-size:20px; letter-spacing:1px; }
 .brand .mark .lut{ color:var(--accent); }
-.brand .sub{
-  font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
-  text-transform:uppercase; letter-spacing:2px;
-}
-.brand .meat{
-  font-family:var(--font-mono); font-size:11px; color:var(--accent-2);
-  border:1px solid var(--line); padding:3px 8px; border-radius:4px;
-}
+.brand .sub{ font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+  text-transform:uppercase; letter-spacing:2px; }
+.brand .meat{ font-family:var(--font-mono); font-size:11px; color:var(--accent-2);
+  border:1px solid var(--line); padding:3px 8px; border-radius:4px; }
 .spacer{ flex:1; }
 
 button.btn{
-  font-family:var(--font-ui); font-weight:600; font-size:13px;
-  color:var(--text); background:var(--surface-2);
-  border:1px solid var(--line); border-radius:6px;
-  padding:8px 14px; cursor:pointer; transition:.12s;
+  font-family:var(--font-ui); font-weight:600; font-size:12.5px; color:var(--text);
+  background:var(--surface-2); border:1px solid var(--line); border-radius:6px;
+  padding:7px 12px; cursor:pointer; transition:.12s;
 }
 button.btn:hover{ border-color:var(--accent); color:#fff; }
 button.btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
 button.btn.primary:hover{ filter:brightness(1.08); }
 button.btn.ghost{ background:transparent; }
+button.btn.on{ border-color:var(--accent-2); color:var(--accent-2); }
 
-/* ----------------------------------------------------------------------------
-   MAIN LAYOUT: preview (flex) + controls (fixed sidebar)
-   -------------------------------------------------------------------------- */
-main{
-  flex:1 1 auto;
-  display:grid;
-  grid-template-columns: 1fr 360px;
-  min-height:0;
+select.sel, input.txt{
+  font-family:var(--font-mono); font-size:12px; color:var(--text);
+  background:var(--surface-2); border:1px solid var(--line); border-radius:6px;
+  padding:6px 8px;
 }
 
-/* --- Preview side --- */
+/* ---- Main layout ---- */
+main{ flex:1 1 auto; display:grid; grid-template-columns:1fr 380px; min-height:0; }
+
 .preview-pane{
-  position:relative;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:24px;
-  min-width:0;
-  background:
-     radial-gradient(circle at 50% 40%, #202020 0%, var(--bg) 70%);
+  position:relative; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; padding:18px; min-width:0;
+  background:radial-gradient(circle at 50% 40%, #202020 0%, var(--bg) 70%);
 }
 .preview-wrap{
-  position:relative;
-  display:inline-block;
-  line-height:0;
-  box-shadow:0 12px 40px rgba(0,0,0,.5);
-  border-radius:6px;
-  overflow:hidden;
-  max-width:100%;
-  max-height:100%;
+  position:relative; display:inline-block; line-height:0;
+  box-shadow:0 12px 40px rgba(0,0,0,.5); border-radius:6px; overflow:hidden;
+  max-width:100%; max-height:100%;
 }
-#glcanvas{
-  display:block;
-  max-width:100%;
-  max-height:calc(100vh - 160px);
-}
+#glcanvas{ display:block; max-width:100%; max-height:calc(100vh - 230px); }
 
-/* Split slider handle (overlays the canvas, drag to move the divider). */
-#splitHandle{
-  position:absolute; top:0; bottom:0; left:50%;
-  transform:translateX(-50%);
-  width:30px; cursor:ew-resize;
-  display:flex; align-items:center; justify-content:center;
-  z-index:5;
-}
-#splitHandle .line{
-  position:absolute; top:0; bottom:0; left:50%;
-  width:2px; margin-left:-1px;
-  background:var(--text);
-  box-shadow:0 0 0 1px rgba(0,0,0,.4);
-}
-#splitHandle .grip{
-  position:relative;
-  width:30px; height:30px; border-radius:50%;
-  background:var(--text); color:var(--bg);
-  display:flex; align-items:center; justify-content:center;
-  font-size:13px; font-weight:700;
-  box-shadow:0 2px 8px rgba(0,0,0,.5);
-}
-.split-label{
-  position:absolute; top:10px;
-  font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
-  color:var(--text); background:rgba(0,0,0,.45);
-  padding:3px 7px; border-radius:4px; z-index:4; pointer-events:none;
-}
+#splitHandle{ position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%);
+  width:30px; cursor:ew-resize; display:flex; align-items:center; justify-content:center; z-index:5; }
+#splitHandle .line{ position:absolute; top:0; bottom:0; left:50%; width:2px; margin-left:-1px;
+  background:var(--text); box-shadow:0 0 0 1px rgba(0,0,0,.4); }
+#splitHandle .grip{ position:relative; width:30px; height:30px; border-radius:50%;
+  background:var(--text); color:var(--bg); display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; box-shadow:0 2px 8px rgba(0,0,0,.5); }
+.split-label{ position:absolute; top:10px; font-family:var(--font-mono); font-size:10px;
+  letter-spacing:2px; color:var(--text); background:rgba(0,0,0,.45); padding:3px 7px;
+  border-radius:4px; z-index:4; pointer-events:none; }
 #beforeLabel{ left:10px; }
 #afterLabel{ right:10px; color:var(--accent-2); }
 
-.preview-toolbar{
-  position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
-  display:flex; gap:8px; align-items:center; z-index:6;
-  background:rgba(20,20,20,.7); backdrop-filter:blur(6px);
-  border:1px solid var(--line); border-radius:8px; padding:6px 8px;
-}
+/* preview lower toolbar + thumbnails */
+.preview-foot{ display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap;
+  justify-content:center; max-width:100%; }
+.thumbs{ display:flex; gap:6px; flex-wrap:wrap; }
+.thumbs img, .thumbs .vid{ width:52px; height:34px; object-fit:cover; border-radius:4px;
+  border:2px solid var(--line); cursor:pointer; }
+.thumbs .active{ border-color:var(--accent); }
+.thumbs .vid{ display:flex; align-items:center; justify-content:center; background:var(--surface-2);
+  color:var(--text-dim); font-size:16px; }
 
-/* --- Controls side --- */
-.controls{
-  background:var(--surface);
-  border-left:1px solid var(--line);
-  overflow-y:auto;
-  padding:0 0 40px;
-}
+/* scopes panel */
+.scopes{ display:none; gap:10px; align-items:flex-start; margin-top:10px; }
+.scopes.show{ display:flex; }
+.scope-box{ background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:6px; }
+.scope-box .cap{ font-family:var(--font-mono); font-size:9px; color:var(--text-dim);
+  letter-spacing:1px; margin-bottom:4px; }
+.scope-box canvas{ display:block; image-rendering:pixelated; }
+
+/* ---- Controls ---- */
+.controls{ background:var(--surface); border-left:1px solid var(--line); overflow-y:auto; padding:0 0 60px; }
 .controls::-webkit-scrollbar{ width:10px; }
 .controls::-webkit-scrollbar-thumb{ background:var(--surface-2); border-radius:6px; }
 
-/* Collapsible section */
 details.section{ border-bottom:1px solid var(--line); }
-details.section > summary{
-  list-style:none; cursor:pointer; user-select:none;
-  padding:12px 16px;
-  display:flex; align-items:center; gap:8px;
-  font-weight:600; font-size:13px; letter-spacing:.4px;
-}
+details.section > summary{ list-style:none; cursor:pointer; user-select:none; padding:11px 16px;
+  display:flex; align-items:center; gap:8px; font-weight:600; font-size:13px; letter-spacing:.3px; }
 details.section > summary::-webkit-details-marker{ display:none; }
-details.section > summary .chev{
-  color:var(--text-dim); transition:.15s; font-size:11px;
-}
+details.section > summary .chev{ color:var(--text-dim); transition:.15s; font-size:11px; }
 details[open] > summary .chev{ transform:rotate(90deg); color:var(--accent); }
-details.section > summary .tag{
-  margin-left:auto; font-family:var(--font-mono); font-size:10px;
-  color:var(--text-dim);
-}
 .section-body{ padding:4px 16px 16px; }
 
-/* Slider rows */
-.ctrl{ margin:10px 0; }
+.ctrl{ margin:9px 0; }
 .ctrl .row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
 .ctrl label{ font-size:12px; color:var(--text-dim); }
-.ctrl .val{
-  font-family:var(--font-mono); font-size:11px; color:var(--text);
-  min-width:48px; text-align:right;
-}
-input[type=range]{
-  -webkit-appearance:none; appearance:none;
-  width:100%; height:4px; border-radius:3px;
-  background:var(--surface-2); outline:none; cursor:pointer;
-}
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none; appearance:none;
-  width:14px; height:14px; border-radius:50%;
-  background:var(--accent); border:2px solid #1a1a1a; cursor:pointer;
-}
-input[type=range]::-moz-range-thumb{
-  width:14px; height:14px; border-radius:50%;
-  background:var(--accent); border:2px solid #1a1a1a; cursor:pointer;
-}
+.ctrl .val{ font-family:var(--font-mono); font-size:11px; color:var(--text); min-width:48px; text-align:right; }
+input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:3px;
+  background:var(--surface-2); outline:none; cursor:pointer; }
+input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:14px; height:14px;
+  border-radius:50%; background:var(--accent); border:2px solid #1a1a1a; cursor:pointer; }
+input[type=range]::-moz-range-thumb{ width:14px; height:14px; border-radius:50%; background:var(--accent);
+  border:2px solid #1a1a1a; cursor:pointer; }
 
-/* 3-way color wheels */
 .wheels{ display:flex; gap:10px; justify-content:space-between; }
 .wheel-unit{ flex:1; text-align:center; }
-.wheel-unit .name{
-  font-size:11px; color:var(--text-dim); margin-bottom:6px;
-  text-transform:uppercase; letter-spacing:1px;
-}
-.wheel{
-  position:relative; width:88px; height:88px; margin:0 auto;
-  border-radius:50%;
-  /* Hue ring via conic-gradient, white center via radial = saturation. */
-  background:
-    radial-gradient(circle, #ffffff 0%, rgba(255,255,255,0) 62%),
-    conic-gradient(from 90deg,
-      #ff0000,#ff8000,#ffff00,#80ff00,#00ff00,#00ff80,
-      #00ffff,#0080ff,#0000ff,#8000ff,#ff00ff,#ff0080,#ff0000);
-  border:1px solid var(--line);
-  touch-action:none;
-}
-.wheel .knob{
-  position:absolute; width:12px; height:12px; border-radius:50%;
-  background:#fff; border:2px solid #111;
-  transform:translate(-50%,-50%); left:50%; top:50%;
-  box-shadow:0 1px 3px rgba(0,0,0,.6); pointer-events:none;
-}
+.wheel-unit .name{ font-size:11px; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+.wheel{ position:relative; width:88px; height:88px; margin:0 auto; border-radius:50%;
+  background:radial-gradient(circle,#fff 0%,rgba(255,255,255,0) 62%),
+    conic-gradient(from 90deg,#f00,#f80,#ff0,#8f0,#0f0,#0f8,#0ff,#08f,#00f,#80f,#f0f,#f08,#f00);
+  border:1px solid var(--line); touch-action:none; }
+.wheel .knob{ position:absolute; width:12px; height:12px; border-radius:50%; background:#fff;
+  border:2px solid #111; transform:translate(-50%,-50%); left:50%; top:50%;
+  box-shadow:0 1px 3px rgba(0,0,0,.6); pointer-events:none; }
 .wheel-unit .lvl{ margin-top:8px; }
 .wheel-unit .lvl .val{ font-size:10px; }
 
-/* HSL band tabs */
 .band-tabs{ display:flex; gap:4px; margin:6px 0 12px; }
-.band-tabs button{
-  flex:1; height:22px; border-radius:4px; cursor:pointer;
-  border:2px solid transparent; padding:0;
-}
+.band-tabs button{ flex:1; height:22px; border-radius:4px; cursor:pointer; border:2px solid transparent; padding:0; }
 .band-tabs button.active{ border-color:var(--text); }
 
-.note{
-  font-size:11px; color:var(--text-dim); line-height:1.5;
-  background:var(--surface-2); border:1px solid var(--line);
-  border-radius:6px; padding:10px; margin:12px 16px;
-}
+/* curve editor */
+.curve-tabs{ display:flex; gap:6px; margin:4px 0 8px; }
+.curve-tabs button{ flex:1; padding:5px 0; font-family:var(--font-mono); font-size:11px;
+  background:var(--surface-2); border:1px solid var(--line); border-radius:5px; color:var(--text-dim); cursor:pointer; }
+.curve-tabs button.active{ color:var(--text); border-color:var(--accent); }
+#curveCanvas{ width:100%; height:240px; background:#161616; border:1px solid var(--line);
+  border-radius:6px; touch-action:none; cursor:crosshair; display:block; }
+.curve-hint{ font-size:10.5px; color:var(--text-dim); margin-top:6px; }
+
+.note{ font-size:11px; color:var(--text-dim); line-height:1.5; background:var(--surface-2);
+  border:1px solid var(--line); border-radius:6px; padding:10px; margin:10px 0; }
 .note b{ color:var(--accent-2); }
 
-.hint{
-  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  pointer-events:none; color:var(--text-dim); font-size:13px;
-}
+.btn-row{ display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+.btn-row button{ flex:1 1 auto; }
+.chip{ font-family:var(--font-mono); font-size:10px; padding:6px 8px; border-radius:5px;
+  background:var(--surface-2); border:1px solid var(--line); color:var(--text); cursor:pointer; }
+.chip:hover{ border-color:var(--accent); }
 
-footer{
-  flex:0 0 auto; padding:6px 20px; background:var(--surface);
-  border-top:1px solid var(--line);
-  font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
-  display:flex; gap:16px; align-items:center;
-}
+.looks-list, .var-list{ display:flex; flex-direction:column; gap:6px; }
+.look-item{ display:flex; align-items:center; gap:8px; background:var(--surface-2);
+  border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+.look-item .nm{ flex:1; font-size:12px; }
+.look-item button{ font-size:10px; padding:3px 6px; }
+
+.dual-up{ display:flex; gap:8px; }
+.dual-up .slot{ flex:1; }
+.dual-up .slot .box{ height:64px; border:1px dashed var(--line); border-radius:6px; display:flex;
+  align-items:center; justify-content:center; color:var(--text-dim); font-size:11px; overflow:hidden; background:var(--surface-2); }
+.dual-up .slot .box img{ width:100%; height:100%; object-fit:cover; }
+.dual-up .slot .cap{ font-size:10px; color:var(--text-dim); text-align:center; margin-top:4px; }
+
+footer{ flex:0 0 auto; padding:6px 18px; background:var(--surface); border-top:1px solid var(--line);
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim); display:flex; gap:14px; align-items:center; }
 footer .dot{ color:var(--ok); }
 </style>
 </head>
 <body>
 
-<!-- =========================== TOP BAR =========================== -->
 <header>
   <div class="brand">
     <span class="mark">LUT&nbsp;<span class="lut">GEN</span></span>
@@ -275,15 +194,27 @@ footer .dot{ color:var(--ok); }
     <span class="meat">MEAT&nbsp;LUT</span>
   </div>
   <div class="spacer"></div>
+  <label style="font-size:11px;color:var(--text-dim)">Input</label>
+  <select class="sel" id="inputTransform" title="Input transfer / log format">
+    <option value="rec709">Rec.709</option>
+    <option value="slog3">Sony S-Log3</option>
+    <option value="vlog">Panasonic V-Log</option>
+    <option value="clog">Canon C-Log</option>
+  </select>
   <button class="btn" id="btnSplit">Split: On</button>
-  <button class="btn ghost" id="btnReset">Reset Grade</button>
-  <button class="btn primary" id="btnLoad">Load Image</button>
-  <input type="file" id="fileInput" accept="image/*" hidden />
+  <button class="btn" id="btnZebra">Zebras: Off</button>
+  <button class="btn" id="btnScopes">Scopes: Off</button>
+  <button class="btn" id="btnImg">+ Image</button>
+  <button class="btn" id="btnVid">+ Video</button>
+  <button class="btn ghost" id="btnReset">Reset</button>
+  <input type="file" id="fileImg" accept="image/*" hidden multiple />
+  <input type="file" id="fileVid" accept="video/*" hidden />
+  <input type="file" id="fileJson" accept="application/json,.json" hidden />
+  <input type="file" id="fileTarget" accept="image/*" hidden />
+  <input type="file" id="fileSource" accept="image/*" hidden />
 </header>
 
-<!-- =========================== MAIN =========================== -->
 <main>
-  <!-- Preview -->
   <section class="preview-pane" id="previewPane">
     <div class="preview-wrap" id="previewWrap">
       <canvas id="glcanvas" width="800" height="500"></canvas>
@@ -291,634 +222,1060 @@ footer .dot{ color:var(--ok); }
       <div class="split-label" id="afterLabel">AFTER</div>
       <div id="splitHandle"><div class="line"></div><div class="grip">◂▸</div></div>
     </div>
+
+    <div class="preview-foot">
+      <div class="thumbs" id="thumbs"></div>
+      <button class="btn ghost" id="btnPlay" style="display:none">▶ Play</button>
+    </div>
+
+    <div class="scopes" id="scopes">
+      <div class="scope-box"><div class="cap">RGB HISTOGRAM</div>
+        <canvas id="histCanvas" width="256" height="120"></canvas></div>
+      <div class="scope-box"><div class="cap">VECTORSCOPE (skin line)</div>
+        <canvas id="vecCanvas" width="140" height="140"></canvas></div>
+    </div>
   </section>
 
-  <!-- Controls (sections are generated into here by JS) -->
-  <aside class="controls" id="controls">
-    <div class="note">
-      <b>Phase 1 — Core grading engine.</b><br>
-      Grade runs live in a WebGL2 shader. Drag the divider to compare
-      before / after. Load your own image to start crafting a look.
-    </div>
-    <!-- sections injected here -->
-  </aside>
+  <aside class="controls" id="controls"></aside>
 </main>
 
 <footer>
   <span class="dot">●</span>
-  <span id="statusText">WebGL2 ready</span>
+  <span id="statusText">starting…</span>
   <span class="spacer" style="flex:1"></span>
   <span id="resText">—</span>
 </footer>
 
 <script>
 /* ============================================================================
-   LUT GEN — PHASE 1
+   LUT GEN — full build (Phases 1–10)
    ----------------------------------------------------------------------------
-   Everything is vanilla JS. The grade is computed entirely in a single WebGL2
-   fragment shader so the preview is real-time and — importantly — the SAME math
-   will later be re-run on an identity LUT grid to BAKE an exact .cube export.
+   Vanilla JS + WebGL2. The grade runs in one fragment shader; the SAME shader
+   is re-run on an identity LUT grid to BAKE exact .cube exports, so the export
+   always matches the preview.
 
-   COLOR-SCIENCE NOTE (Phase 1 default, easy to revisit):
-   We grade directly on the image's stored 0..1 RGB values (display / encoded
-   space), NOT in scene-linear light. This is the natural model for a LUT that
-   gets dropped onto Rec.709 video later: the LUT maps encoded RGB -> encoded
-   RGB. Log decode + linear options arrive in Phase 7.
+   COLOR SPACE: We grade on the values the LUT will actually see. For Rec.709
+   input we grade the stored 0..1 (display/encoded) values directly. For LOG
+   inputs we DECODE the log to linear then ENCODE to Rec.709 first ("normalize"),
+   grade on that, and the same decode is baked into the exported LUT so it drops
+   straight onto log footage. Output is always Rec.709.
    ========================================================================== */
 
-/* --------------------------------------------------------------------------
-   1. GRADE STATE  — the single source of truth for the whole look.
-      Every control writes here; render() pushes it to the shader.
-   -------------------------------------------------------------------------- */
+const clamp01 = v => Math.max(0, Math.min(1, v));
 const HSL_BANDS = ['Red','Orange','Yellow','Green','Aqua','Blue','Magenta'];
 
+/* --------------------------------------------------------------------------
+   GRADE STATE — single source of truth (everything serialisable for save/load)
+   -------------------------------------------------------------------------- */
 function defaultGrade(){
   return {
-    // White balance
+    inputTransform:'rec709',
     temp:0, tint:0,
-    // Tone
-    exposure:0, contrast:0,
-    highlights:0, shadows:0, whites:0, blacks:0,
-    // 3-way color (each wheel: x,y position in [-1,1] + a master level)
-    lift:  {x:0,y:0,level:0},
-    gamma: {x:0,y:0,level:0},
-    gain:  {x:0,y:0,level:0},
-    // HSL per band (7 entries each)
-    hsl:{
-      hue: new Array(7).fill(0),
-      sat: new Array(7).fill(0),
-      lum: new Array(7).fill(0),
-    },
-    // Overall colour
+    exposure:0, contrast:0, highlights:0, shadows:0, whites:0, blacks:0,
+    lift:{x:0,y:0,level:0}, gamma:{x:0,y:0,level:0}, gain:{x:0,y:0,level:0},
+    hsl:{ hue:Array(7).fill(0), sat:Array(7).fill(0), lum:Array(7).fill(0) },
     saturation:0, vibrance:0,
+    // split toning: hue 0..360, strength 0..1, balance -1..1
+    split:{ shHue:210, shAmt:0, hiHue:45, hiAmt:0, balance:0 },
+    fade:0,                                  // faded-black floor 0..0.25
+    curves:{ master:[{x:0,y:0},{x:1,y:1}],
+             r:[{x:0,y:0},{x:1,y:1}],
+             g:[{x:0,y:0},{x:1,y:1}],
+             b:[{x:0,y:0},{x:1,y:1}] },
   };
 }
 let grade = defaultGrade();
 
-/* UI state (not part of the exported look) */
-let splitOn   = true;   // before/after compare active?
-let splitPos  = 0.5;    // 0..1 divider position
-let activeBand = 0;     // which HSL band the sliders currently edit
+/* UI-only state */
+let splitOn=true, splitPos=0.5, zebraOn=false, scopesOn=false;
+let activeBand=0, activeCurve='master';
+let looks=[];                  // saved looks [{name, grade}]
+let sources=[];               // preview sources [{type:'image'|'video', el, name, thumb}]
+let activeSource=0;
+let refTarget=null, refSource=null;   // reference look-match images
 
 /* --------------------------------------------------------------------------
-   2. COLOR HELPERS (JS side)
-      The 3-way wheels are converted to RGB offset vectors here, then sent to
-      the shader. Doing it in JS keeps the shader simpler and the math is the
-      same for preview and (later) for baking.
+   COLOR HELPERS (JS)
    -------------------------------------------------------------------------- */
-function hsvToRgb(h,s,v){            // h,s,v in 0..1 -> [r,g,b] 0..1
-  const i=Math.floor(h*6), f=h*6-i;
-  const p=v*(1-s), q=v*(1-f*s), t=v*(1-(1-f)*s);
-  switch(i%6){
-    case 0: return [v,t,p];
-    case 1: return [q,v,p];
-    case 2: return [p,v,t];
-    case 3: return [p,q,v];
-    case 4: return [t,p,v];
-    default:return [v,p,q];
-  }
+function hsvToRgb(h,s,v){
+  const i=Math.floor(h*6), f=h*6-i, p=v*(1-s), q=v*(1-f*s), t=v*(1-(1-f)*s);
+  switch(i%6){case 0:return[v,t,p];case 1:return[q,v,p];case 2:return[p,v,t];
+    case 3:return[p,q,v];case 4:return[t,p,v];default:return[v,p,q];}
 }
-// Wheel position (x,y in [-1,1]) -> a *luma-neutral* RGB colour push.
-// Angle = hue, distance from centre = strength.
+// luma-neutral colour push from a wheel position (x,y in [-1,1])
 function wheelToRGB(x,y){
-  const r = Math.min(1, Math.hypot(x,y));
-  if(r < 1e-5) return [0,0,0];
-  let ang = Math.atan2(y,x) * 180/Math.PI;   // degrees
-  let hue = ((ang % 360) + 360) % 360;
-  const [cr,cg,cb] = hsvToRgb(hue/360, 1, 1);
-  const l = 0.2126*cr + 0.7152*cg + 0.0722*cb; // remove luma -> pure colour
-  return [(cr-l)*r, (cg-l)*r, (cb-l)*r];
+  const r=Math.min(1,Math.hypot(x,y)); if(r<1e-5)return[0,0,0];
+  let hue=((Math.atan2(y,x)*180/Math.PI)%360+360)%360;
+  const [cr,cg,cb]=hsvToRgb(hue/360,1,1);
+  const l=0.2126*cr+0.7152*cg+0.0722*cb;
+  return [(cr-l)*r,(cg-l)*r,(cb-l)*r];
 }
-// Build the lift / gamma / gain RGB triplets the shader expects.
-// Defaults are identity: lift=0, gamma=1, gain=1.
-function liftVec(){
-  const c = wheelToRGB(grade.lift.x, grade.lift.y);
-  const lv = grade.lift.level * 0.30;          // master lift (raises blacks)
-  return [c[0]*0.20 + lv, c[1]*0.20 + lv, c[2]*0.20 + lv];
+// luma-neutral tint from a hue (deg) + strength — for split toning
+function hueTint(hueDeg, amt){
+  const [cr,cg,cb]=hsvToRgb(((hueDeg%360)+360)%360/360,1,1);
+  const l=0.2126*cr+0.7152*cg+0.0722*cb;
+  return [(cr-l)*amt,(cg-l)*amt,(cb-l)*amt];
 }
-function gammaVec(){
-  const c = wheelToRGB(grade.gamma.x, grade.gamma.y);
-  const lv = grade.gamma.level * 0.50;
-  return [1 + c[0]*0.40 + lv, 1 + c[1]*0.40 + lv, 1 + c[2]*0.40 + lv];
-}
-function gainVec(){
-  const c = wheelToRGB(grade.gain.x, grade.gain.y);
-  const lv = grade.gain.level * 0.50;
-  return [1 + c[0]*0.40 + lv, 1 + c[1]*0.40 + lv, 1 + c[2]*0.40 + lv];
+function liftVec(){ const c=wheelToRGB(grade.lift.x,grade.lift.y), lv=grade.lift.level*0.30;
+  return [c[0]*0.20+lv,c[1]*0.20+lv,c[2]*0.20+lv]; }
+function gammaVec(){ const c=wheelToRGB(grade.gamma.x,grade.gamma.y), lv=grade.gamma.level*0.50;
+  return [1+c[0]*0.40+lv,1+c[1]*0.40+lv,1+c[2]*0.40+lv]; }
+function gainVec(){ const c=wheelToRGB(grade.gain.x,grade.gain.y), lv=grade.gain.level*0.50;
+  return [1+c[0]*0.40+lv,1+c[1]*0.40+lv,1+c[2]*0.40+lv]; }
+
+/* --------------------------------------------------------------------------
+   MONOTONE CUBIC SPLINE — for the curve editor (no overshoot = clean curves)
+   -------------------------------------------------------------------------- */
+function buildSpline(points){
+  const pts=points.slice().sort((a,b)=>a.x-b.x);
+  const n=pts.length, xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  if(n===1) return ()=>ys[0];
+  const dx=[],dy=[],m=[];
+  for(let i=0;i<n-1;i++){dx[i]=xs[i+1]-xs[i]||1e-6; dy[i]=ys[i+1]-ys[i]; m[i]=dy[i]/dx[i];}
+  const t=Array(n); t[0]=m[0]; t[n-1]=m[n-2];
+  for(let i=1;i<n-1;i++) t[i]=(m[i-1]*m[i]<=0)?0:(m[i-1]+m[i])/2;
+  for(let i=0;i<n-1;i++){
+    if(m[i]===0){t[i]=0;t[i+1]=0;continue;}
+    const a=t[i]/m[i], b=t[i+1]/m[i], h=Math.hypot(a,b);
+    if(h>3){const s=3/h; t[i]=s*a*m[i]; t[i+1]=s*b*m[i];}
+  }
+  return function(x){
+    if(x<=xs[0])return ys[0]; if(x>=xs[n-1])return ys[n-1];
+    let i=0; while(x>xs[i+1])i++;
+    const h=dx[i], u=(x-xs[i])/h;
+    const h00=(1+2*u)*(1-u)*(1-u), h10=u*(1-u)*(1-u), h01=u*u*(3-2*u), h11=u*u*(u-1);
+    return h00*ys[i]+h10*h*t[i]+h01*ys[i+1]+h11*h*t[i+1];
+  };
 }
 
 /* --------------------------------------------------------------------------
-   3. WEBGL2 SETUP
+   WEBGL2 SETUP
    -------------------------------------------------------------------------- */
-const canvas = document.getElementById('glcanvas');
-const gl = canvas.getContext('webgl2', {preserveDrawingBuffer:true});
-if(!gl){
-  document.getElementById('statusText').textContent =
-    'WebGL2 not supported in this browser.';
+const canvas=document.getElementById('glcanvas');
+const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true});
+let floatOK=false;
+if(gl){ floatOK=!!gl.getExtension('EXT_color_buffer_float'); }
+function setStatus(s){ document.getElementById('statusText').textContent=s; }
+if(!gl) setStatus('WebGL2 not supported in this browser.');
+
+const VERT=`#version 300 es
+in vec2 aPos; out vec2 vUv;
+void main(){ vUv=aPos*0.5+0.5; gl_Position=vec4(aPos,0.0,1.0); }`;
+
+const FRAG=`#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 fragColor;
+uniform sampler2D uImage;
+uniform sampler2D uCurve;      // 256x1: .r/.g/.b = curve output per channel
+uniform vec2 uRes;             // output resolution (for zebra stripes)
+uniform int  uInput;           // 0 rec709,1 slog3,2 vlog,3 clog
+uniform float uSplit; uniform bool uShowSplit; uniform bool uZebra; uniform bool uBake;
+uniform float uTemp,uTint,uExposure,uContrast,uHighlights,uShadows,uWhites,uBlacks;
+uniform vec3 uLift,uGamma,uGain;
+uniform float uHslHue[7],uHslSat[7],uHslLum[7];
+uniform float uSaturation,uVibrance;
+uniform vec3 uShadowTint,uHighlightTint; uniform float uSplitBalance;
+uniform float uFade;
+
+float luma(vec3 c){ return dot(c,vec3(0.2126,0.7152,0.0722)); }
+
+/* ---- log decodes (published formulas) -> scene-linear ---- */
+float slog3(float x){ // Sony S-Log3
+  return (x>=171.2102946929/1023.0)
+    ? (pow(10.0,((x*1023.0-420.0)/261.5)))*(0.18+0.01)-0.01
+    : (x*1023.0-95.0)*0.01125000/(171.2102946929-95.0);
+}
+float vlog(float x){ // Panasonic V-Log
+  const float b=0.00873,c=0.241514,d=0.598206;
+  return (x<0.181)?(x-0.125)/5.6:pow(10.0,(x-d)/c)-b;
+}
+float clog(float x){ // Canon C-Log (original)
+  return (pow(10.0,(x-0.0730597)/0.529136)-1.0)/10.1596;
+}
+float lin2709(float c){ // Rec.709 OETF (encode linear -> 709)
+  c=max(c,0.0);
+  return (c<0.018)?c*4.5:1.099*pow(c,0.45)-0.099;
+}
+vec3 inputDecode(vec3 c){
+  if(uInput==0) return c;                    // already Rec.709
+  vec3 lin;
+  if(uInput==1) lin=vec3(slog3(c.r),slog3(c.g),slog3(c.b));
+  else if(uInput==2) lin=vec3(vlog(c.r),vlog(c.g),vlog(c.b));
+  else lin=vec3(clog(c.r),clog(c.g),clog(c.b));
+  return vec3(lin2709(lin.r),lin2709(lin.g),lin2709(lin.b));
 }
 
-const VERT = `#version 300 es
-in vec2 aPos;
-out vec2 vUv;
-void main(){
-  vUv = aPos * 0.5 + 0.5;             // map clip-space quad to 0..1 UVs
-  gl_Position = vec4(aPos, 0.0, 1.0);
-}`;
-
-const FRAG = `#version 300 es
-precision highp float;
-in vec2 vUv;
-out vec4 fragColor;
-
-uniform sampler2D uImage;
-uniform float uSplit;       // divider position 0..1
-uniform bool  uShowSplit;   // before/after compare on?
-
-/* White balance */
-uniform float uTemp, uTint;
-/* Tone */
-uniform float uExposure, uContrast;
-uniform float uHighlights, uShadows, uWhites, uBlacks;
-/* 3-way colour */
-uniform vec3 uLift, uGamma, uGain;
-/* HSL (per band) */
-uniform float uHslHue[7];
-uniform float uHslSat[7];
-uniform float uHslLum[7];
-/* Overall */
-uniform float uSaturation, uVibrance;
-
-const float PI = 3.14159265;
-float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-
-/* ---- RGB <-> HSL ---- */
 vec3 rgb2hsl(vec3 c){
-  float mx = max(max(c.r,c.g),c.b);
-  float mn = min(min(c.r,c.g),c.b);
-  float h=0.0, s=0.0, l=(mx+mn)*0.5;
-  float d = mx-mn;
-  if(d > 1e-5){
-    s = l > 0.5 ? d/(2.0-mx-mn) : d/(mx+mn);
-    if(mx == c.r)      h = (c.g-c.b)/d + (c.g < c.b ? 6.0 : 0.0);
-    else if(mx == c.g) h = (c.b-c.r)/d + 2.0;
-    else               h = (c.r-c.g)/d + 4.0;
-    h /= 6.0;
-  }
+  float mx=max(max(c.r,c.g),c.b),mn=min(min(c.r,c.g),c.b);
+  float h=0.0,s=0.0,l=(mx+mn)*0.5,d=mx-mn;
+  if(d>1e-5){ s=l>0.5?d/(2.0-mx-mn):d/(mx+mn);
+    if(mx==c.r) h=(c.g-c.b)/d+(c.g<c.b?6.0:0.0);
+    else if(mx==c.g) h=(c.b-c.r)/d+2.0; else h=(c.r-c.g)/d+4.0; h/=6.0; }
   return vec3(h,s,l);
 }
-float hue2rgb(float p, float q, float t){
-  if(t < 0.0) t += 1.0;
-  if(t > 1.0) t -= 1.0;
-  if(t < 1.0/6.0) return p + (q-p)*6.0*t;
-  if(t < 1.0/2.0) return q;
-  if(t < 2.0/3.0) return p + (q-p)*(2.0/3.0 - t)*6.0;
-  return p;
+float hue2rgb(float p,float q,float t){
+  if(t<0.0)t+=1.0; if(t>1.0)t-=1.0;
+  if(t<1.0/6.0)return p+(q-p)*6.0*t; if(t<1.0/2.0)return q;
+  if(t<2.0/3.0)return p+(q-p)*(2.0/3.0-t)*6.0; return p;
 }
 vec3 hsl2rgb(vec3 hsl){
-  float h=hsl.x, s=hsl.y, l=hsl.z;
-  if(s < 1e-5) return vec3(l);
-  float q = l < 0.5 ? l*(1.0+s) : l + s - l*s;
-  float p = 2.0*l - q;
-  return vec3( hue2rgb(p,q,h + 1.0/3.0),
-               hue2rgb(p,q,h),
-               hue2rgb(p,q,h - 1.0/3.0) );
+  float h=hsl.x,s=hsl.y,l=hsl.z; if(s<1e-5)return vec3(l);
+  float q=l<0.5?l*(1.0+s):l+s-l*s, p=2.0*l-q;
+  return vec3(hue2rgb(p,q,h+1.0/3.0),hue2rgb(p,q,h),hue2rgb(p,q,h-1.0/3.0));
 }
 
-/* =====================================================================
-   THE GRADE — runs per pixel. This exact chain will later be re-run on
-   an identity LUT grid to bake the .cube export.
-   ===================================================================== */
+/* ===================== THE GRADE (also baked into the LUT) ================ */
 vec3 applyGrade(vec3 c){
-
-  /* 1. White balance ------------------------------------------------- */
-  // temp +: warmer (boost R, cut B).  tint +: magenta (cut G).
-  c.r *= (1.0 + uTemp*0.30);
-  c.b *= (1.0 - uTemp*0.30);
-  c.g *= (1.0 - uTint*0.30);
-
-  /* 2. Exposure (brightness in "stops") ------------------------------ */
-  c *= pow(2.0, uExposure);
-
-  /* 3. Contrast around 0.5 pivot ------------------------------------- */
-  c = (c - 0.5) * (1.0 + uContrast) + 0.5;
-
-  /* 4. 3-way colour: gain (highs) -> lift (shadows) -> gamma (mids) -- */
-  c = c * uGain;
-  c = c + uLift * (1.0 - c);
-  c = pow(max(c, 0.0), 1.0 / max(uGamma, vec3(0.001)));
-
-  /* 5. Tonal regions (highlights/shadows/whites/blacks) -------------- */
-  // NOTE: smoothstep needs ascending edges, so the "dark" masks are inverted.
-  float L = luma(clamp(c,0.0,1.0));
-  c += uShadows    * 0.50 * (1.0 - smoothstep(0.0, 0.5, L));
-  c += uHighlights * 0.50 * smoothstep(0.5, 1.0, L);
-  c += uBlacks     * 0.50 * (1.0 - smoothstep(0.0, 0.25, L));
-  c += uWhites     * 0.50 * smoothstep(0.75, 1.0, L);
-
-  /* 6. HSL per band -------------------------------------------------- */
-  // Each band has a centre hue; pixels near it get weighted hue/sat/lum tweaks.
-  const float centers[7] = float[7](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 300.0);
-  vec3 hsl = rgb2hsl(clamp(c, 0.0, 1.0));
-  float hueDeg = hsl.x * 360.0;
-  float hueShift = 0.0, satMul = 1.0, lumAdd = 0.0;
+  c=inputDecode(c);                                  // 0. log -> Rec.709
+  c.r*=(1.0+uTemp*0.30); c.b*=(1.0-uTemp*0.30); c.g*=(1.0-uTint*0.30); // 1. WB
+  c*=pow(2.0,uExposure);                             // 2. exposure
+  c=(c-0.5)*(1.0+uContrast)+0.5;                     // 3. contrast
+  c=c*uGain; c=c+uLift*(1.0-c); c=pow(max(c,0.0),1.0/max(uGamma,vec3(0.001))); // 4. 3-way
+  float L=luma(clamp(c,0.0,1.0));                    // 5. tonal regions
+  c+=uShadows*0.50*(1.0-smoothstep(0.0,0.5,L));
+  c+=uHighlights*0.50*smoothstep(0.5,1.0,L);
+  c+=uBlacks*0.50*(1.0-smoothstep(0.0,0.25,L));
+  c+=uWhites*0.50*smoothstep(0.75,1.0,L);
+  const float centers[7]=float[7](0.0,30.0,60.0,120.0,180.0,240.0,300.0); // 6. HSL
+  vec3 hsl=rgb2hsl(clamp(c,0.0,1.0));
+  float hueDeg=hsl.x*360.0, hueShift=0.0, satMul=1.0, lumAdd=0.0;
   for(int i=0;i<7;i++){
-    float dist = abs(hueDeg - centers[i]);
-    dist = min(dist, 360.0 - dist);
-    float w = smoothstep(1.0, 0.0, dist/45.0) * hsl.y; // gate by saturation
-    hueShift += uHslHue[i] * 30.0 * w;                 // +/- 30 deg max
-    satMul   *= (1.0 + uHslSat[i] * w);
-    lumAdd   += uHslLum[i] * 0.5 * w;
+    float dist=abs(hueDeg-centers[i]); dist=min(dist,360.0-dist);
+    float w=smoothstep(1.0,0.0,dist/45.0)*hsl.y;
+    hueShift+=uHslHue[i]*30.0*w; satMul*=(1.0+uHslSat[i]*w); lumAdd+=uHslLum[i]*0.5*w;
   }
-  hsl.x = fract(hsl.x + hueShift/360.0);
-  hsl.y = clamp(hsl.y * satMul, 0.0, 1.0);
-  hsl.z = clamp(hsl.z + lumAdd, 0.0, 1.0);
-  c = hsl2rgb(hsl);
-
-  /* 7. Saturation + Vibrance ----------------------------------------- */
-  float L2 = luma(c);
-  c = mix(vec3(L2), c, 1.0 + uSaturation);             // global saturation
-  float mx = max(max(c.r,c.g),c.b);
-  float mn = min(min(c.r,c.g),c.b);
-  float sat = mx - mn;
-  c = mix(vec3(luma(c)), c, 1.0 + uVibrance*(1.0 - sat)); // protect saturated
-
+  hsl.x=fract(hsl.x+hueShift/360.0); hsl.y=clamp(hsl.y*satMul,0.0,1.0); hsl.z=clamp(hsl.z+lumAdd,0.0,1.0);
+  c=hsl2rgb(hsl);
+  float Ls=luma(clamp(c,0.0,1.0));                   // 7. split toning
+  c+=uShadowTint*smoothstep(0.5+uSplitBalance*0.5,0.0,Ls);
+  c+=uHighlightTint*smoothstep(0.5+uSplitBalance*0.5,1.0,Ls);
+  c=clamp(c,0.0,1.0);                                 // 8. curves (master baked per-channel)
+  c.r=texture(uCurve,vec2(c.r,0.5)).r;
+  c.g=texture(uCurve,vec2(c.g,0.5)).g;
+  c.b=texture(uCurve,vec2(c.b,0.5)).b;
+  float L2=luma(c);                                  // 9. saturation + vibrance
+  c=mix(vec3(L2),c,1.0+uSaturation);
+  float mx=max(max(c.r,c.g),c.b),mn=min(min(c.r,c.g),c.b);
+  c=mix(vec3(luma(c)),c,1.0+uVibrance*(1.0-(mx-mn)));
+  c=uFade+(1.0-uFade)*c;                             // 10. faded-black floor
   return c;
 }
 
 void main(){
-  vec3 orig   = texture(uImage, vUv).rgb;
-  vec3 graded = applyGrade(orig);
-
-  // Left of the divider = original (before), right = graded (after).
-  vec3 outc = (uShowSplit && vUv.x < uSplit) ? orig : graded;
-  fragColor = vec4(clamp(outc, 0.0, 1.0), 1.0);
+  vec3 orig=texture(uImage,vUv).rgb;
+  vec3 g=applyGrade(orig);
+  if(uBake){ fragColor=vec4(g,1.0); return; }        // raw graded values for the LUT bake
+  vec3 outc=(uShowSplit && vUv.x<uSplit)?inputDecode(orig):g; // before side = normalized orig
+  outc=clamp(outc,0.0,1.0);
+  if(uZebra && !(uShowSplit && vUv.x<uSplit)){       // clipping zebras (preview only)
+    float stripe=mod(gl_FragCoord.x+gl_FragCoord.y,12.0);
+    bool hi=max(max(g.r,g.g),g.b)>=0.999, lo=min(min(g.r,g.g),g.b)<=0.001;
+    if(hi && stripe<6.0) outc=vec3(1.0,0.1,0.1);
+    if(lo && stripe>=6.0) outc=vec3(0.2,0.4,1.0);
+  }
+  fragColor=vec4(outc,1.0);
 }`;
 
-// --- compile helpers ---
-function compile(type, src){
-  const sh = gl.createShader(type);
-  gl.shaderSource(sh, src);
-  gl.compileShader(sh);
-  if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
-    console.error(gl.getShaderInfoLog(sh));
-    document.getElementById('statusText').textContent = 'Shader error (see console).';
-  }
+function compile(type,src){
+  const sh=gl.createShader(type); gl.shaderSource(sh,src); gl.compileShader(sh);
+  if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){ console.error(gl.getShaderInfoLog(sh)); setStatus('Shader error (see console).'); }
   return sh;
 }
-let program, uniforms = {};
+let program,uniforms={};
+function U(n){ return uniforms[n]; }
 function buildProgram(){
-  program = gl.createProgram();
-  gl.attachShader(program, compile(gl.VERTEX_SHADER, VERT));
-  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, FRAG));
-  gl.bindAttribLocation(program, 0, 'aPos');
-  gl.linkProgram(program);
-  if(!gl.getProgramParameter(program, gl.LINK_STATUS)){
-    console.error(gl.getProgramInfoLog(program));
-  }
+  program=gl.createProgram();
+  gl.attachShader(program,compile(gl.VERTEX_SHADER,VERT));
+  gl.attachShader(program,compile(gl.FRAGMENT_SHADER,FRAG));
+  gl.bindAttribLocation(program,0,'aPos'); gl.linkProgram(program);
+  if(!gl.getProgramParameter(program,gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(program));
   gl.useProgram(program);
-
-  // Cache every uniform location we will set each frame.
-  const names = ['uImage','uSplit','uShowSplit','uTemp','uTint','uExposure',
-    'uContrast','uHighlights','uShadows','uWhites','uBlacks',
-    'uLift','uGamma','uGain','uSaturation','uVibrance',
-    'uHslHue[0]','uHslSat[0]','uHslLum[0]'];
-  names.forEach(n => uniforms[n] = gl.getUniformLocation(program, n));
+  ['uImage','uCurve','uRes','uInput','uSplit','uShowSplit','uZebra','uBake',
+   'uTemp','uTint','uExposure','uContrast','uHighlights','uShadows','uWhites','uBlacks',
+   'uLift','uGamma','uGain','uSaturation','uVibrance',
+   'uShadowTint','uHighlightTint','uSplitBalance','uFade',
+   'uHslHue[0]','uHslSat[0]','uHslLum[0]'].forEach(n=>uniforms[n]=gl.getUniformLocation(program,n));
 }
-
-// Full-screen quad (triangle strip).
 function buildQuad(){
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER,
-    new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 }
 
-// Texture that holds the current preview image.
-let tex, imgW = 800, imgH = 500;
+// preview image/video texture (unit 0)
+let tex,imgW=800,imgH=500;
 function buildTexture(){
-  tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 }
-function uploadImage(src){
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);  // images are top-down
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
-  imgW = src.width; imgH = src.height;
-  canvas.width = imgW; canvas.height = imgH;
-  gl.viewport(0,0,imgW,imgH);
-  document.getElementById('resText').textContent = imgW + ' × ' + imgH;
-  render();
+function uploadSource(src){
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+  gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
+  imgW=src.videoWidth||src.width; imgH=src.videoHeight||src.height;
+  canvas.width=imgW; canvas.height=imgH;
+  document.getElementById('resText').textContent=imgW+' × '+imgH;
+}
+
+// curve LUT texture (unit 1)
+let curveTex;
+function buildCurveTexture(){
+  curveTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,curveTex);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  updateCurveTexture();
+}
+function updateCurveTexture(){
+  const N=256, data=new Uint8Array(N*4);
+  const fm=buildSpline(grade.curves.master), fr=buildSpline(grade.curves.r),
+        fg=buildSpline(grade.curves.g), fb=buildSpline(grade.curves.b);
+  for(let i=0;i<N;i++){
+    const x=i/(N-1), m=clamp01(fm(x));
+    data[i*4]=clamp01(fr(m))*255; data[i*4+1]=clamp01(fg(m))*255;
+    data[i*4+2]=clamp01(fb(m))*255; data[i*4+3]=255;
+  }
+  gl.bindTexture(gl.TEXTURE_2D,curveTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,N,1,0,gl.RGBA,gl.UNSIGNED_BYTE,data);
 }
 
 /* --------------------------------------------------------------------------
-   4. RENDER — push state to the shader and draw.
+   SET UNIFORMS + DRAW  (shared by preview, bake, scopes, offscreen renders)
    -------------------------------------------------------------------------- */
-function render(){
+const INPUT_MAP={rec709:0,slog3:1,vlog:2,clog:3};
+function setGradeUniforms(){
+  gl.uniform1i(U('uInput'),INPUT_MAP[grade.inputTransform]||0);
+  gl.uniform1f(U('uTemp'),grade.temp); gl.uniform1f(U('uTint'),grade.tint);
+  gl.uniform1f(U('uExposure'),grade.exposure); gl.uniform1f(U('uContrast'),grade.contrast);
+  gl.uniform1f(U('uHighlights'),grade.highlights); gl.uniform1f(U('uShadows'),grade.shadows);
+  gl.uniform1f(U('uWhites'),grade.whites); gl.uniform1f(U('uBlacks'),grade.blacks);
+  gl.uniform3fv(U('uLift'),liftVec()); gl.uniform3fv(U('uGamma'),gammaVec()); gl.uniform3fv(U('uGain'),gainVec());
+  gl.uniform1fv(U('uHslHue[0]'),grade.hsl.hue); gl.uniform1fv(U('uHslSat[0]'),grade.hsl.sat); gl.uniform1fv(U('uHslLum[0]'),grade.hsl.lum);
+  gl.uniform1f(U('uSaturation'),grade.saturation); gl.uniform1f(U('uVibrance'),grade.vibrance);
+  gl.uniform3fv(U('uShadowTint'),hueTint(grade.split.shHue,grade.split.shAmt*0.3));
+  gl.uniform3fv(U('uHighlightTint'),hueTint(grade.split.hiHue,grade.split.hiAmt*0.3));
+  gl.uniform1f(U('uSplitBalance'),grade.split.balance);
+  gl.uniform1f(U('uFade'),grade.fade);
+}
+function drawPreview(){
   if(!program) return;
   gl.useProgram(program);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.uniform1i(uniforms['uImage'], 0);
-
-  gl.uniform1f(uniforms['uSplit'], splitPos);
-  gl.uniform1i(uniforms['uShowSplit'], splitOn ? 1 : 0);
-
-  gl.uniform1f(uniforms['uTemp'], grade.temp);
-  gl.uniform1f(uniforms['uTint'], grade.tint);
-  gl.uniform1f(uniforms['uExposure'], grade.exposure);
-  gl.uniform1f(uniforms['uContrast'], grade.contrast);
-  gl.uniform1f(uniforms['uHighlights'], grade.highlights);
-  gl.uniform1f(uniforms['uShadows'], grade.shadows);
-  gl.uniform1f(uniforms['uWhites'], grade.whites);
-  gl.uniform1f(uniforms['uBlacks'], grade.blacks);
-
-  gl.uniform3fv(uniforms['uLift'],  liftVec());
-  gl.uniform3fv(uniforms['uGamma'], gammaVec());
-  gl.uniform3fv(uniforms['uGain'],  gainVec());
-
-  gl.uniform1fv(uniforms['uHslHue[0]'], grade.hsl.hue);
-  gl.uniform1fv(uniforms['uHslSat[0]'], grade.hsl.sat);
-  gl.uniform1fv(uniforms['uHslLum[0]'], grade.hsl.lum);
-
-  gl.uniform1f(uniforms['uSaturation'], grade.saturation);
-  gl.uniform1f(uniforms['uVibrance'], grade.vibrance);
-
-  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  gl.viewport(0,0,canvas.width,canvas.height);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex); gl.uniform1i(U('uImage'),0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,curveTex); gl.uniform1i(U('uCurve'),1);
+  setGradeUniforms();
+  gl.uniform2f(U('uRes'),canvas.width,canvas.height);
+  gl.uniform1f(U('uSplit'),splitPos);
+  gl.uniform1i(U('uShowSplit'),splitOn?1:0);
+  gl.uniform1i(U('uZebra'),zebraOn?1:0);
+  gl.uniform1i(U('uBake'),0);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
 }
+// the main render entry; also refreshes scopes when shown
+function render(){ drawPreview(); if(scopesOn) updateScopes(); }
 
 /* --------------------------------------------------------------------------
-   5. DEFAULT TEST IMAGE — so the tool works before any upload.
-      A gradient + colour swatches + a skin-tone patch to judge looks.
+   DEFAULT TEST IMAGE
    -------------------------------------------------------------------------- */
 function makeDefaultImage(){
-  const c = document.createElement('canvas');
-  c.width = 800; c.height = 500;
-  const x = c.getContext('2d');
-  // sky-to-ground vertical gradient
-  const g = x.createLinearGradient(0,0,0,500);
+  const c=document.createElement('canvas'); c.width=800; c.height=500;
+  const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,500);
   g.addColorStop(0,'#3a5a80'); g.addColorStop(.5,'#86756a'); g.addColorStop(1,'#241c16');
-  x.fillStyle = g; x.fillRect(0,0,800,500);
-  // greyscale ramp (to watch contrast / tone)
-  for(let i=0;i<16;i++){
-    const v = Math.round(i/15*255);
-    x.fillStyle = `rgb(${v},${v},${v})`;
-    x.fillRect(40 + i*44, 40, 44, 50);
-  }
-  // colour swatches
-  const cols = ['#c0392b','#e67e22','#f1c40f','#27ae60','#16a085','#2980b9','#8e44ad'];
-  cols.forEach((col,i)=>{ x.fillStyle=col; x.fillRect(40+i*100, 110, 100, 60); });
-  // skin-tone patches (the thing LUTs must not wreck)
-  const skins = ['#f1c6a8','#d9a07a','#a9745a','#5c3b2e'];
-  skins.forEach((s,i)=>{ x.fillStyle=s; x.beginPath();
-    x.arc(140+i*180, 330, 55, 0, Math.PI*2); x.fill(); });
-  x.fillStyle='rgba(245,243,239,.85)';
-  x.font='600 22px "Space Grotesk", sans-serif';
-  x.fillText('LUT GEN · load your own image to grade', 40, 470);
+  x.fillStyle=g; x.fillRect(0,0,800,500);
+  for(let i=0;i<16;i++){ const v=Math.round(i/15*255); x.fillStyle=`rgb(${v},${v},${v})`; x.fillRect(40+i*44,40,44,50); }
+  ['#c0392b','#e67e22','#f1c40f','#27ae60','#16a085','#2980b9','#8e44ad'].forEach((col,i)=>{ x.fillStyle=col; x.fillRect(40+i*100,110,100,60); });
+  ['#f1c6a8','#d9a07a','#a9745a','#5c3b2e'].forEach((s,i)=>{ x.fillStyle=s; x.beginPath(); x.arc(140+i*180,330,55,0,Math.PI*2); x.fill(); });
+  x.fillStyle='rgba(245,243,239,.85)'; x.font='600 22px "Space Grotesk",sans-serif';
+  x.fillText('LUT GEN · load your own image to grade',40,470);
   return c;
 }
 
-/* --------------------------------------------------------------------------
-   6. CONTROL UI GENERATION
-   -------------------------------------------------------------------------- */
-const controlsEl = document.getElementById('controls');
+/* ==========================================================================
+   CONTROL UI
+   ========================================================================== */
+const controlsEl=document.getElementById('controls');
+const sliderRefs=[]; const wheelRefs=[]; let hslSliders={}; let splitSliders={};
+let curveEditor=null;
 
-// Generic collapsible section.
-function addSection(title, open=false){
-  const d = document.createElement('details');
-  d.className = 'section';
-  if(open) d.open = true;
-  d.innerHTML = `<summary><span class="chev">▶</span>${title}<span class="tag"></span></summary>`;
-  const body = document.createElement('div');
-  body.className = 'section-body';
-  d.appendChild(body);
-  controlsEl.appendChild(d);
-  return body;
+function addSection(title,open=false){
+  const d=document.createElement('details'); d.className='section'; if(open)d.open=true;
+  d.innerHTML=`<summary><span class="chev">▶</span>${title}</summary>`;
+  const body=document.createElement('div'); body.className='section-body';
+  d.appendChild(body); controlsEl.appendChild(d); return body;
 }
-
-// A labelled slider bound to a getter/setter so it works for nested state too.
-function addSlider(parent, opts){
-  const {label, min, max, step, get, set, fmt} = opts;
-  const wrap = document.createElement('div'); wrap.className = 'ctrl';
-  const fmtFn = fmt || (v => (v>0?'+':'') + v.toFixed(2));
-  wrap.innerHTML =
-    `<div class="row"><label>${label}</label><span class="val"></span></div>`;
-  const input = document.createElement('input');
-  input.type='range'; input.min=min; input.max=max; input.step=step;
-  input.value = get();
-  wrap.appendChild(input);
-  const val = wrap.querySelector('.val');
-  const refresh = ()=>{ val.textContent = fmtFn(get()); };
-  refresh();
-  input.addEventListener('input', ()=>{
-    set(parseFloat(input.value)); refresh(); render();
-  });
-  // allow external refresh (used by HSL band switching + global reset)
-  input._refresh = ()=>{ input.value = get(); refresh(); };
-  parent.appendChild(wrap);
-  return input;
+function addNote(parent,html){ const n=document.createElement('div'); n.className='note'; n.innerHTML=html; parent.appendChild(n); return n; }
+function addSlider(parent,o){
+  const wrap=document.createElement('div'); wrap.className='ctrl';
+  const fmtFn=o.fmt||(v=>(v>0?'+':'')+v.toFixed(2));
+  wrap.innerHTML=`<div class="row"><label>${o.label}</label><span class="val"></span></div>`;
+  const input=document.createElement('input'); input.type='range';
+  input.min=o.min; input.max=o.max; input.step=o.step; input.value=o.get();
+  wrap.appendChild(input); const val=wrap.querySelector('.val');
+  const refresh=()=>val.textContent=fmtFn(o.get()); refresh();
+  input.addEventListener('input',()=>{ o.set(parseFloat(input.value)); refresh(); render(); });
+  input._refresh=()=>{ input.value=o.get(); refresh(); };
+  parent.appendChild(wrap); return input;
 }
-
-// 3-way colour wheel control bound to grade[key] = {x,y,level}.
-function addWheel(parent, key, name){
-  const unit = document.createElement('div'); unit.className='wheel-unit';
-  unit.innerHTML = `<div class="name">${name}</div>
-    <div class="wheel"><div class="knob"></div></div>`;
+function addWheel(parent,key,name){
+  const unit=document.createElement('div'); unit.className='wheel-unit';
+  unit.innerHTML=`<div class="name">${name}</div><div class="wheel"><div class="knob"></div></div>`;
   parent.appendChild(unit);
+  const wheel=unit.querySelector('.wheel'), knob=unit.querySelector('.knob'), st=()=>grade[key];
+  const place=()=>{ knob.style.left=(50+st().x*50)+'%'; knob.style.top=(50-st().y*50)+'%'; }; place();
+  let drag=false;
+  const set=e=>{ const r=wheel.getBoundingClientRect();
+    let nx=((e.clientX-r.left)/r.width-0.5)*2, ny=-((e.clientY-r.top)/r.height-0.5)*2;
+    const len=Math.hypot(nx,ny); if(len>1){nx/=len;ny/=len;} st().x=nx; st().y=ny; place(); render(); };
+  wheel.addEventListener('pointerdown',e=>{drag=true; wheel.setPointerCapture(e.pointerId); set(e);});
+  wheel.addEventListener('pointermove',e=>{ if(drag)set(e); });
+  wheel.addEventListener('pointerup',()=>drag=false);
+  wheel.addEventListener('dblclick',()=>{ st().x=0; st().y=0; place(); render(); });
+  const lvl=document.createElement('div'); lvl.className='lvl'; unit.appendChild(lvl);
+  const lvlInput=addSlider(lvl,{label:'Level',min:-1,max:1,step:0.01,get:()=>st().level,set:v=>st().level=v});
+  unit._replace=()=>{ place(); lvlInput._refresh(); }; return unit;
+}
 
-  const wheel = unit.querySelector('.wheel');
-  const knob  = unit.querySelector('.knob');
-  // Read the state live via grade[key] so it survives a "Reset Grade"
-  // (which replaces the whole grade object).
-  const st = ()=> grade[key];
-
-  // place knob from current x,y (y up = positive)
-  function place(){
-    knob.style.left = (50 + st().x*50) + '%';
-    knob.style.top  = (50 - st().y*50) + '%';
-  }
-  place();
-
-  let dragging = false;
-  function setFromEvent(e){
-    const r = wheel.getBoundingClientRect();
-    let nx = ( (e.clientX - r.left) / r.width  - 0.5) * 2;  //  -1..1
-    let ny = -( (e.clientY - r.top ) / r.height - 0.5) * 2; //  invert (up = +)
-    const len = Math.hypot(nx,ny);
-    if(len > 1){ nx/=len; ny/=len; }                        // clamp to circle
-    st().x = nx; st().y = ny; place(); render();
-  }
-  wheel.addEventListener('pointerdown', e=>{
-    dragging=true; wheel.setPointerCapture(e.pointerId); setFromEvent(e);
+/* ---------- Curve editor ---------- */
+function makeCurveEditor(cv){
+  const ctx=cv.getContext('2d');
+  function rect(){ return cv.getBoundingClientRect(); }
+  function toXY(e){ const r=rect(); return { x:clamp01((e.clientX-r.left)/r.width), y:clamp01(1-(e.clientY-r.top)/r.height) }; }
+  let dragIdx=-1;
+  function pts(){ return grade.curves[activeCurve]; }
+  function nearest(p){ let bi=-1,bd=1e9; pts().forEach((q,i)=>{ const d=Math.hypot(q.x-p.x,q.y-p.y); if(d<bd){bd=d;bi=i;} }); return bd<0.04?bi:-1; }
+  cv.addEventListener('pointerdown',e=>{
+    cv.setPointerCapture(e.pointerId); const p=toXY(e); let i=nearest(p);
+    if(e.shiftKey && i>0 && i<pts().length-1){ pts().splice(i,1); afterEdit(); return; } // shift-click delete
+    if(i<0){ pts().push({x:p.x,y:p.y}); pts().sort((a,b)=>a.x-b.x); i=pts().findIndex(q=>q.x===p.x&&q.y===p.y); }
+    dragIdx=i; moveTo(p);
   });
-  wheel.addEventListener('pointermove', e=>{ if(dragging) setFromEvent(e); });
-  wheel.addEventListener('pointerup',   ()=> dragging=false);
-  // double-click resets the wheel colour (keeps level)
-  wheel.addEventListener('dblclick', ()=>{ st().x=0; st().y=0; place(); render(); });
-
-  // master level slider beneath the wheel
-  const lvl = document.createElement('div'); lvl.className='lvl';
-  unit.appendChild(lvl);
-  const lvlInput = addSlider(lvl, {
-    label:'Level', min:-1, max:1, step:0.01,
-    get:()=>st().level, set:v=>st().level=v
-  });
-
-  unit._replace = ()=>{ place(); lvlInput._refresh(); };
-  return unit;
-}
-
-// Keep references so reset + band-switch can refresh the inputs.
-const sliderRefs = [];   // all flat sliders
-const wheelRefs  = [];   // 3-way wheels
-let hslSliders = {};     // {hue, sat, lum} inputs for the active band
-
-function buildUI(){
-  /* --- White Balance --- */
-  let b = addSection('White Balance', true);
-  sliderRefs.push(addSlider(b,{label:'Temperature',min:-1,max:1,step:0.01,
-    get:()=>grade.temp,set:v=>grade.temp=v}));
-  sliderRefs.push(addSlider(b,{label:'Tint',min:-1,max:1,step:0.01,
-    get:()=>grade.tint,set:v=>grade.tint=v}));
-
-  /* --- Tone --- */
-  b = addSection('Tone', true);
-  sliderRefs.push(addSlider(b,{label:'Exposure',min:-3,max:3,step:0.01,
-    get:()=>grade.exposure,set:v=>grade.exposure=v,
-    fmt:v=>(v>0?'+':'')+v.toFixed(2)+' EV'}));
-  sliderRefs.push(addSlider(b,{label:'Contrast',min:-1,max:1,step:0.01,
-    get:()=>grade.contrast,set:v=>grade.contrast=v}));
-  sliderRefs.push(addSlider(b,{label:'Highlights',min:-1,max:1,step:0.01,
-    get:()=>grade.highlights,set:v=>grade.highlights=v}));
-  sliderRefs.push(addSlider(b,{label:'Shadows',min:-1,max:1,step:0.01,
-    get:()=>grade.shadows,set:v=>grade.shadows=v}));
-  sliderRefs.push(addSlider(b,{label:'Whites',min:-1,max:1,step:0.01,
-    get:()=>grade.whites,set:v=>grade.whites=v}));
-  sliderRefs.push(addSlider(b,{label:'Blacks',min:-1,max:1,step:0.01,
-    get:()=>grade.blacks,set:v=>grade.blacks=v}));
-
-  /* --- 3-Way Color --- */
-  b = addSection('3-Way Color (Lift / Gamma / Gain)', true);
-  const wheelsRow = document.createElement('div'); wheelsRow.className='wheels';
-  b.appendChild(wheelsRow);
-  wheelRefs.push(addWheel(wheelsRow,'lift','Lift'));
-  wheelRefs.push(addWheel(wheelsRow,'gamma','Gamma'));
-  wheelRefs.push(addWheel(wheelsRow,'gain','Gain'));
-
-  /* --- HSL --- */
-  b = addSection('HSL / Color Mixer');
-  const tabs = document.createElement('div'); tabs.className='band-tabs';
-  b.appendChild(tabs);
-  const tabHues = [0,30,60,120,180,240,300];   // for the tab swatch colours
-  HSL_BANDS.forEach((name,i)=>{
-    const btn=document.createElement('button');
-    btn.title=name;
-    btn.style.background = `hsl(${tabHues[i]} 70% 50%)`;
-    if(i===0) btn.classList.add('active');
-    btn.addEventListener('click',()=>{
-      activeBand=i;
-      [...tabs.children].forEach(c=>c.classList.remove('active'));
-      btn.classList.add('active');
-      refreshHsl();
-    });
-    tabs.appendChild(btn);
-  });
-  hslSliders.hue = addSlider(b,{label:'Hue',min:-1,max:1,step:0.01,
-    get:()=>grade.hsl.hue[activeBand], set:v=>grade.hsl.hue[activeBand]=v});
-  hslSliders.sat = addSlider(b,{label:'Saturation',min:-1,max:1,step:0.01,
-    get:()=>grade.hsl.sat[activeBand], set:v=>grade.hsl.sat[activeBand]=v});
-  hslSliders.lum = addSlider(b,{label:'Luminance',min:-1,max:1,step:0.01,
-    get:()=>grade.hsl.lum[activeBand], set:v=>grade.hsl.lum[activeBand]=v});
-
-  /* --- Overall Color --- */
-  b = addSection('Saturation & Vibrance');
-  sliderRefs.push(addSlider(b,{label:'Saturation',min:-1,max:1,step:0.01,
-    get:()=>grade.saturation,set:v=>grade.saturation=v}));
-  sliderRefs.push(addSlider(b,{label:'Vibrance',min:-1,max:1,step:0.01,
-    get:()=>grade.vibrance,set:v=>grade.vibrance=v}));
-}
-function refreshHsl(){
-  hslSliders.hue._refresh();
-  hslSliders.sat._refresh();
-  hslSliders.lum._refresh();
-}
-
-/* --------------------------------------------------------------------------
-   7. SPLIT SLIDER (drag the divider)
-   -------------------------------------------------------------------------- */
-const handle = document.getElementById('splitHandle');
-const wrap   = document.getElementById('previewWrap');
-function positionHandle(){ handle.style.left = (splitPos*100) + '%'; }
-function updateSplitFromX(clientX){
-  const r = canvas.getBoundingClientRect();
-  splitPos = Math.max(0, Math.min(1, (clientX - r.left)/r.width));
-  positionHandle(); render();
-}
-let dragSplit=false;
-handle.addEventListener('pointerdown', e=>{
-  dragSplit=true; handle.setPointerCapture(e.pointerId); e.preventDefault();
-});
-handle.addEventListener('pointermove', e=>{ if(dragSplit) updateSplitFromX(e.clientX); });
-handle.addEventListener('pointerup',   ()=> dragSplit=false);
-
-/* --------------------------------------------------------------------------
-   8. TOP-BAR BUTTONS + IMAGE UPLOAD
-   -------------------------------------------------------------------------- */
-const fileInput = document.getElementById('fileInput');
-document.getElementById('btnLoad').addEventListener('click',()=> fileInput.click());
-fileInput.addEventListener('change', e=>{
-  const f = e.target.files[0]; if(!f) return;
-  const img = new Image();
-  img.onload = ()=>{ uploadImage(img); URL.revokeObjectURL(img.src); };
-  img.src = URL.createObjectURL(f);
-});
-// drag & drop onto the preview
-['dragover','drop'].forEach(ev=>{
-  document.getElementById('previewPane').addEventListener(ev, e=>{
-    e.preventDefault();
-    if(ev==='drop' && e.dataTransfer.files[0]){
-      const img=new Image();
-      img.onload=()=>{ uploadImage(img); URL.revokeObjectURL(img.src); };
-      img.src=URL.createObjectURL(e.dataTransfer.files[0]);
+  cv.addEventListener('pointermove',e=>{ if(dragIdx<0)return; moveTo(toXY(e)); });
+  cv.addEventListener('pointerup',()=>dragIdx=-1);
+  cv.addEventListener('dblclick',()=>{ grade.curves[activeCurve]=[{x:0,y:0},{x:1,y:1}]; afterEdit(); });
+  function moveTo(p){
+    const a=pts(); const isEnd=(dragIdx===0||dragIdx===a.length-1);
+    a[dragIdx].y=p.y;
+    if(!isEnd){ // keep x ordered, don't cross neighbours
+      a[dragIdx].x=Math.min(Math.max(p.x,a[dragIdx-1].x+0.01),a[dragIdx+1].x-0.01);
     }
+    afterEdit();
+  }
+  function afterEdit(){ updateCurveTexture(); draw(); render(); }
+  function draw(){
+    const w=cv.width=cv.clientWidth*devicePixelRatio, h=cv.height=cv.clientHeight*devicePixelRatio;
+    ctx.clearRect(0,0,w,h); ctx.fillStyle='#161616'; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='#2c2c2c'; ctx.lineWidth=1;
+    for(let i=1;i<4;i++){ const gx=w*i/4; ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke();
+      const gy=h*i/4; ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(w,gy); ctx.stroke(); }
+    ctx.strokeStyle='#3a3a3a'; ctx.beginPath(); ctx.moveTo(0,h); ctx.lineTo(w,0); ctx.stroke(); // identity diag
+    const f=buildSpline(pts());
+    const col={master:'#F5F3EF',r:'#FA4616',g:'#4ED39B',b:'#2980ff'}[activeCurve];
+    ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath();
+    for(let i=0;i<=100;i++){ const x=i/100, y=clamp01(f(x)); const px=x*w, py=(1-y)*h; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+    ctx.stroke();
+    ctx.fillStyle=col; pts().forEach(q=>{ ctx.beginPath(); ctx.arc(q.x*w,(1-q.y)*h,5*devicePixelRatio,0,Math.PI*2); ctx.fill(); });
+  }
+  return { draw };
+}
+
+/* ---------- presets / variations / look-match helpers ---------- */
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function applyGradeObj(g){ grade=Object.assign(defaultGrade(),clone(g)); refreshAllUI(); updateCurveTexture(); render(); }
+
+const PRESETS={
+  'Clean Neutral':()=>defaultGrade(),
+  'Warm Portrait Film':()=>{ const g=defaultGrade(); g.temp=0.18; g.tint=0.05; g.contrast=0.08;
+    g.highlights=-0.15; g.shadows=0.12; g.saturation=-0.05; g.vibrance=0.12;
+    g.split={shHue:200,shAmt:0.10,hiHue:40,hiAmt:0.18,balance:0.1}; g.fade=0.03;
+    g.hsl.sat[0]=0.1; g.hsl.lum[1]=0.05; return g; },
+  'Cool Cinematic':()=>{ const g=defaultGrade(); g.temp=-0.15; g.contrast=0.18; g.blacks=-0.12;
+    g.gain={x:-0.25,y:0.35,level:0}; g.lift={x:0.45,y:-0.35,level:0}; g.saturation=-0.08;
+    g.split={shHue:210,shAmt:0.22,hiHue:45,hiAmt:0.12,balance:0}; return g; },
+  'Faded Retro':()=>{ const g=defaultGrade(); g.contrast=-0.12; g.fade=0.12; g.saturation=-0.18;
+    g.temp=0.08; g.split={shHue:170,shAmt:0.14,hiHue:50,hiAmt:0.16,balance:0.15};
+    g.curves.master=[{x:0,y:0.08},{x:0.5,y:0.52},{x:1,y:0.92}]; return g; },
+  'Punchy Teal-Orange':()=>{ const g=defaultGrade(); g.contrast=0.22; g.vibrance=0.25; g.saturation=0.05;
+    g.gain={x:0.4,y:0.18,level:0.05}; g.lift={x:-0.3,y:0.4,level:0};
+    g.hsl.hue[1]=0.06; g.hsl.sat[5]=0.2; g.hsl.sat[4]=0.2;
+    g.split={shHue:195,shAmt:0.20,hiHue:35,hiAmt:0.18,balance:0}; return g; },
+};
+// Build a set of tasteful variations from the current grade.
+function makeVariations(base){
+  const v=[];
+  const mk=(name,fn)=>{ const g=clone(base); fn(g); v.push({name,grade:g}); };
+  mk('Warmer',g=>{ g.temp=clamp(g.temp+0.15,-1,1); g.split.hiAmt=Math.min(1,g.split.hiAmt+0.1); });
+  mk('Cooler',g=>{ g.temp=clamp(g.temp-0.15,-1,1); g.split.shAmt=Math.min(1,g.split.shAmt+0.1); });
+  mk('More Faded',g=>{ g.fade=Math.min(0.25,g.fade+0.08); g.contrast=clamp(g.contrast-0.08,-1,1); });
+  mk('Higher Contrast',g=>{ g.contrast=clamp(g.contrast+0.18,-1,1); g.blacks=clamp(g.blacks-0.06,-1,1); });
+  mk('More Saturated',g=>{ g.vibrance=clamp(g.vibrance+0.18,-1,1); g.saturation=clamp(g.saturation+0.08,-1,1); });
+  mk('Less Saturated',g=>{ g.saturation=clamp(g.saturation-0.18,-1,1); });
+  return v;
+}
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+// Reference look-match: mean/std colour transfer -> editable R/G/B curves.
+function analyzeImage(img){
+  const c=document.createElement('canvas'); const s=64; c.width=s; c.height=s;
+  const x=c.getContext('2d'); x.drawImage(img,0,0,s,s);
+  const d=x.getImageData(0,0,s,s).data; const n=s*s;
+  const sum=[0,0,0], sq=[0,0,0];
+  for(let i=0;i<n;i++){ for(let k=0;k<3;k++){ const v=d[i*4+k]/255; sum[k]+=v; sq[k]+=v*v; } }
+  const mean=sum.map(v=>v/n);
+  const std=sq.map((v,k)=>Math.sqrt(Math.max(1e-6,v/n-mean[k]*mean[k])));
+  return {mean,std};
+}
+function runLookMatch(){
+  if(!refTarget||!refSource){ setStatus('Look-match needs both a target and a source image.'); return; }
+  const T=analyzeImage(refTarget), S=analyzeImage(refSource);
+  const chans=['r','g','b'];
+  chans.forEach((ch,k)=>{
+    const scale=clamp(T.std[k]/S.std[k],0.3,3.0);
+    const offset=T.mean[k]-S.mean[k]*scale;
+    // fit a 3-point editable curve to y = scale*x + offset (clamped to 0..1)
+    grade.curves[ch]=[0,0.5,1].map(x=>({x, y:clamp01(scale*x+offset)}));
   });
-});
+  grade.curves.master=[{x:0,y:0},{x:1,y:1}];
+  refreshAllUI(); updateCurveTexture(); render();
+  setStatus('Look-match applied as editable R/G/B curves — refine away.');
+}
 
-document.getElementById('btnSplit').addEventListener('click', e=>{
-  splitOn = !splitOn;
-  e.target.textContent = 'Split: ' + (splitOn ? 'On':'Off');
-  handle.style.display = splitOn ? 'flex':'none';
-  document.getElementById('beforeLabel').style.display = splitOn?'block':'none';
-  document.getElementById('afterLabel').style.display  = splitOn?'block':'none';
-  render();
-});
+/* ==========================================================================
+   BUILD ALL CONTROL SECTIONS
+   ========================================================================== */
+function buildUI(){
+  /* Input / color space */
+  let b=addSection('Input / Color Space',false);
+  addNote(b,`<b>Log support.</b> Pick the footage's transfer. Log inputs are decoded to
+    Rec.709 for grading, and that conversion is <b>baked into the exported LUT</b> so it
+    drops onto log footage. Output is Rec.709. Formulas: S-Log3 (Sony), V-Log (Panasonic),
+    C-Log (Canon, original). Tell me if you shoot C-Log2/3 and I'll add them.`);
 
-document.getElementById('btnReset').addEventListener('click', ()=>{
-  grade = defaultGrade();
-  // refresh every input from the fresh state
-  sliderRefs.forEach(s=>s._refresh());
-  wheelRefs.forEach(w=>w._replace());
-  refreshHsl();
-  render();
-});
+  /* Reference look-match */
+  b=addSection('Reference Look-Match',false);
+  addNote(b,`Upload a <b>target look</b> and your <b>source/neutral</b> still; I compute a
+    starting grade (per-channel mean/std transfer) as <b>editable curves</b>.
+    Use your own images — don't clone copyrighted frames for resale.`);
+  const dual=document.createElement('div'); dual.className='dual-up';
+  dual.innerHTML=`<div class="slot"><div class="box" id="boxTarget">target</div><div class="cap">Target look</div></div>
+                  <div class="slot"><div class="box" id="boxSource">source</div><div class="cap">Your source</div></div>`;
+  b.appendChild(dual);
+  const rowM=document.createElement('div'); rowM.className='btn-row';
+  rowM.innerHTML=`<button class="btn" id="btnTarget">Load Target</button>
+                  <button class="btn" id="btnSource">Load Source</button>
+                  <button class="btn primary" id="btnMatch">Match →</button>`;
+  b.appendChild(rowM);
 
-/* --------------------------------------------------------------------------
-   9. INIT
-   -------------------------------------------------------------------------- */
+  /* Presets */
+  b=addSection('Film-Stock Presets',false);
+  const pr=document.createElement('div'); pr.className='btn-row';
+  Object.keys(PRESETS).forEach(name=>{ const btn=document.createElement('button'); btn.className='chip';
+    btn.textContent=name; btn.onclick=()=>{ applyGradeObj(PRESETS[name]()); setStatus('Preset: '+name); }; pr.appendChild(btn); });
+  b.appendChild(pr);
+
+  /* White balance */
+  b=addSection('White Balance',true);
+  sliderRefs.push(addSlider(b,{label:'Temperature',min:-1,max:1,step:0.01,get:()=>grade.temp,set:v=>grade.temp=v}));
+  sliderRefs.push(addSlider(b,{label:'Tint',min:-1,max:1,step:0.01,get:()=>grade.tint,set:v=>grade.tint=v}));
+
+  /* Tone */
+  b=addSection('Tone',true);
+  sliderRefs.push(addSlider(b,{label:'Exposure',min:-3,max:3,step:0.01,get:()=>grade.exposure,set:v=>grade.exposure=v,fmt:v=>(v>0?'+':'')+v.toFixed(2)+' EV'}));
+  sliderRefs.push(addSlider(b,{label:'Contrast',min:-1,max:1,step:0.01,get:()=>grade.contrast,set:v=>grade.contrast=v}));
+  sliderRefs.push(addSlider(b,{label:'Highlights',min:-1,max:1,step:0.01,get:()=>grade.highlights,set:v=>grade.highlights=v}));
+  sliderRefs.push(addSlider(b,{label:'Shadows',min:-1,max:1,step:0.01,get:()=>grade.shadows,set:v=>grade.shadows=v}));
+  sliderRefs.push(addSlider(b,{label:'Whites',min:-1,max:1,step:0.01,get:()=>grade.whites,set:v=>grade.whites=v}));
+  sliderRefs.push(addSlider(b,{label:'Blacks',min:-1,max:1,step:0.01,get:()=>grade.blacks,set:v=>grade.blacks=v}));
+
+  /* 3-way */
+  b=addSection('3-Way Color (Lift / Gamma / Gain)',true);
+  const wr=document.createElement('div'); wr.className='wheels'; b.appendChild(wr);
+  wheelRefs.push(addWheel(wr,'lift','Lift')); wheelRefs.push(addWheel(wr,'gamma','Gamma')); wheelRefs.push(addWheel(wr,'gain','Gain'));
+
+  /* HSL */
+  b=addSection('HSL / Color Mixer',false);
+  const tabs=document.createElement('div'); tabs.className='band-tabs'; b.appendChild(tabs);
+  const tabHues=[0,30,60,120,180,240,300];
+  HSL_BANDS.forEach((name,i)=>{ const btn=document.createElement('button'); btn.title=name;
+    btn.style.background=`hsl(${tabHues[i]} 70% 50%)`; if(i===0)btn.classList.add('active');
+    btn.onclick=()=>{ activeBand=i; [...tabs.children].forEach(c=>c.classList.remove('active')); btn.classList.add('active'); refreshHsl(); };
+    tabs.appendChild(btn); });
+  hslSliders.hue=addSlider(b,{label:'Hue',min:-1,max:1,step:0.01,get:()=>grade.hsl.hue[activeBand],set:v=>grade.hsl.hue[activeBand]=v});
+  hslSliders.sat=addSlider(b,{label:'Saturation',min:-1,max:1,step:0.01,get:()=>grade.hsl.sat[activeBand],set:v=>grade.hsl.sat[activeBand]=v});
+  hslSliders.lum=addSlider(b,{label:'Luminance',min:-1,max:1,step:0.01,get:()=>grade.hsl.lum[activeBand],set:v=>grade.hsl.lum[activeBand]=v});
+
+  /* Curves */
+  b=addSection('Curves ⭐',true);
+  const ct=document.createElement('div'); ct.className='curve-tabs'; b.appendChild(ct);
+  [['master','RGB'],['r','R'],['g','G'],['b','B']].forEach(([k,lbl])=>{ const btn=document.createElement('button');
+    btn.textContent=lbl; if(k==='master')btn.classList.add('active');
+    btn.onclick=()=>{ activeCurve=k; [...ct.children].forEach(c=>c.classList.remove('active')); btn.classList.add('active'); curveEditor.draw(); };
+    ct.appendChild(btn); });
+  const cv=document.createElement('canvas'); cv.id='curveCanvas'; b.appendChild(cv);
+  const hint=document.createElement('div'); hint.className='curve-hint';
+  hint.innerHTML='Click to add a point · drag to move · <b>Shift-click</b> to delete · double-click to reset channel.';
+  b.appendChild(hint);
+  curveEditor=makeCurveEditor(cv);
+
+  /* Split toning */
+  b=addSection('Split Toning',false);
+  splitSliders.shHue=addSlider(b,{label:'Shadow Hue',min:0,max:360,step:1,get:()=>grade.split.shHue,set:v=>grade.split.shHue=v,fmt:v=>v.toFixed(0)+'°'});
+  splitSliders.shAmt=addSlider(b,{label:'Shadow Amount',min:0,max:1,step:0.01,get:()=>grade.split.shAmt,set:v=>grade.split.shAmt=v});
+  splitSliders.hiHue=addSlider(b,{label:'Highlight Hue',min:0,max:360,step:1,get:()=>grade.split.hiHue,set:v=>grade.split.hiHue=v,fmt:v=>v.toFixed(0)+'°'});
+  splitSliders.hiAmt=addSlider(b,{label:'Highlight Amount',min:0,max:1,step:0.01,get:()=>grade.split.hiAmt,set:v=>grade.split.hiAmt=v});
+  splitSliders.balance=addSlider(b,{label:'Balance',min:-1,max:1,step:0.01,get:()=>grade.split.balance,set:v=>grade.split.balance=v});
+
+  /* Saturation / vibrance + faded black */
+  b=addSection('Saturation, Vibrance & Fade',false);
+  sliderRefs.push(addSlider(b,{label:'Saturation',min:-1,max:1,step:0.01,get:()=>grade.saturation,set:v=>grade.saturation=v}));
+  sliderRefs.push(addSlider(b,{label:'Vibrance',min:-1,max:1,step:0.01,get:()=>grade.vibrance,set:v=>grade.vibrance=v}));
+  sliderRefs.push(addSlider(b,{label:'Faded Black (matte floor)',min:0,max:0.25,step:0.005,get:()=>grade.fade,set:v=>grade.fade=v}));
+
+  /* Variations */
+  b=addSection('Auto Variations',false);
+  const vrow=document.createElement('div'); vrow.className='btn-row';
+  vrow.innerHTML=`<button class="btn primary" id="btnVary">Generate Variations → Looks</button>`;
+  b.appendChild(vrow);
+  addNote(b,'Turns the current grade into a tasteful pack: warmer, cooler, faded, punchier, more/less saturated — each saved as a Look below.');
+
+  /* Saved looks */
+  b=addSection('Saved Looks / Pack',false);
+  const lrow=document.createElement('div'); lrow.className='btn-row';
+  lrow.innerHTML=`<button class="btn" id="btnSaveLook">Save current</button>
+                  <button class="btn" id="btnBranch">Branch from current</button>`;
+  b.appendChild(lrow);
+  const lrow2=document.createElement('div'); lrow2.className='btn-row';
+  lrow2.innerHTML=`<button class="btn" id="btnSaveJson">Save grade JSON</button>
+                   <button class="btn" id="btnLoadJson">Load grade JSON</button>`;
+  b.appendChild(lrow2);
+  const lrow3=document.createElement('div'); lrow3.className='btn-row';
+  lrow3.innerHTML=`<button class="btn primary" id="btnBatchCube">Batch export pack (.cube)</button>
+                   <button class="btn" id="btnContact">QC contact sheet</button>`;
+  b.appendChild(lrow3);
+  const list=document.createElement('div'); list.className='looks-list'; list.id='looksList'; b.appendChild(list);
+
+  /* Export */
+  b=addSection('Export LUT',true);
+  const erow=document.createElement('div'); erow.className='btn-row';
+  erow.innerHTML=`<label style="font-size:12px;color:var(--text-dim);align-self:center">Size</label>
+                  <select class="sel" id="lutSize"><option value="17">17</option><option value="33" selected>33</option><option value="65">65</option></select>
+                  <label style="font-size:12px;color:var(--text-dim);align-self:center">Intensity %</label>
+                  <input class="txt" id="lutStrength" style="width:60px" value="100">`;
+  b.appendChild(erow);
+  const erow2=document.createElement('div'); erow2.className='btn-row';
+  erow2.innerHTML=`<button class="btn primary" id="btnCube">Export .cube</button>
+                   <button class="btn" id="btnPng">PNG LUT</button>
+                   <button class="btn" id="btnXmp">.xmp (approx)</button>`;
+  b.appendChild(erow2);
+  const erow3=document.createElement('div'); erow3.className='btn-row';
+  erow3.innerHTML=`<button class="btn" id="btnTrio">Subtle/Medium/Strong trio (.cube)</button>`;
+  b.appendChild(erow3);
+  const erow4=document.createElement('div'); erow4.className='btn-row';
+  erow4.innerHTML=`<button class="btn" id="btnCover">Auto cover image (PNG)</button>
+                   <button class="btn ghost" id="btnSelftest">Verify identity</button>`;
+  b.appendChild(erow4);
+  addNote(b,`<b>.cube is exact</b> (the grade is baked by re-running this exact shader on an
+    identity grid). <b>.xmp is an approximation</b> of supported sliders. Each export is labelled
+    with its intended input (e.g. "for Sony S-Log3").`);
+
+  wireActions();
+  refreshLooks();
+}
+function refreshHsl(){ hslSliders.hue._refresh(); hslSliders.sat._refresh(); hslSliders.lum._refresh(); }
+function refreshAllUI(){
+  document.getElementById('inputTransform').value=grade.inputTransform;
+  sliderRefs.forEach(s=>s._refresh()); wheelRefs.forEach(w=>w._replace()); refreshHsl();
+  Object.values(splitSliders).forEach(s=>s._refresh());
+  if(curveEditor) curveEditor.draw();
+}
+
+/* ==========================================================================
+   LUT BAKE + EXPORTERS
+   ========================================================================== */
+// Run the EXACT grade shader on an N^3 identity grid, return Float32 RGB array.
+function bakeLUT(N){
+  if(!floatOK){ setStatus('Float render targets unavailable — export needs EXT_color_buffer_float.'); return null; }
+  const W=N*N, H=N;
+  // identity grid as a float texture (exact coords; no 8-bit quantisation)
+  const id=new Float32Array(W*H*4);
+  for(let bz=0;bz<N;bz++)for(let gy=0;gy<N;gy++)for(let rx=0;rx<N;rx++){
+    const px=bz*N+rx, o=(gy*W+px)*4;
+    id[o]=rx/(N-1); id[o+1]=gy/(N-1); id[o+2]=bz/(N-1); id[o+3]=1;
+  }
+  const idTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,idTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,W,H,0,gl.RGBA,gl.FLOAT,id);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  // float render target
+  const rt=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,rt);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,W,H,0,gl.RGBA,gl.FLOAT,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  const fbo=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,rt,0);
+  // draw with bake flag
+  gl.useProgram(program); gl.viewport(0,0,W,H);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,idTex); gl.uniform1i(U('uImage'),0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,curveTex); gl.uniform1i(U('uCurve'),1);
+  setGradeUniforms();
+  gl.uniform1i(U('uShowSplit'),0); gl.uniform1i(U('uZebra'),0); gl.uniform1i(U('uBake'),1);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  const out=new Float32Array(W*H*4); gl.readPixels(0,0,W,H,gl.RGBA,gl.FLOAT,out);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  gl.deleteTexture(idTex); gl.deleteTexture(rt); gl.deleteFramebuffer(fbo);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+  render(); // restore preview state
+  return {data:out,N,W};
+}
+function lutValue(bake,r,g,b){ const px=b*bake.N+r, o=(g*bake.W+px)*4; return [bake.data[o],bake.data[o+1],bake.data[o+2]]; }
+
+function lutTitle(){
+  const inp={rec709:'Rec.709',slog3:'Sony S-Log3',vlog:'Panasonic V-Log',clog:'Canon C-Log'}[grade.inputTransform];
+  return `MEAT LUT — LUT GEN (for ${inp})`;
+}
+// Build .cube text. strength 0..1 blends identity<->graded (intensity bake).
+function buildCube(N,strength){
+  const bake=bakeLUT(N); if(!bake) return null;
+  let s=`# ${lutTitle()}\n# Generated by LUT GEN · intended input: ${grade.inputTransform}\n`;
+  s+=`TITLE "${lutTitle()}${strength<1?` ${Math.round(strength*100)}%`:''}"\n`;
+  s+=`LUT_3D_SIZE ${N}\nDOMAIN_MIN 0.0 0.0 0.0\nDOMAIN_MAX 1.0 1.0 1.0\n`;
+  for(let b=0;b<N;b++)for(let g=0;g<N;g++)for(let r=0;r<N;r++){ // red fastest
+    let [R,G,B]=lutValue(bake,r,g,b);
+    if(strength<1){ const ir=r/(N-1),ig=g/(N-1),ib=b/(N-1);
+      R=ir+(R-ir)*strength; G=ig+(G-ig)*strength; B=ib+(B-ib)*strength; }
+    s+=`${R.toFixed(6)} ${G.toFixed(6)} ${B.toFixed(6)}\n`;
+  }
+  return s;
+}
+function download(name,text,mime){
+  const blob=(text instanceof Blob)?text:new Blob([text],{type:mime||'text/plain'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function safeName(s){ return (s||'look').replace(/[^a-z0-9_-]+/gi,'_'); }
+
+function exportCube(strength){
+  const N=parseInt(document.getElementById('lutSize').value);
+  const st=strength!=null?strength:clamp01((parseFloat(document.getElementById('lutStrength').value)||100)/100);
+  const txt=buildCube(N,st); if(!txt)return;
+  download(`${safeName(currentLookName())}_${grade.inputTransform}${st<1?'_'+Math.round(st*100):''}.cube`,txt);
+  setStatus(`.cube exported (${N}³, ${Math.round(st*100)}%, for ${grade.inputTransform}).`);
+}
+function exportTrio(){ [0.33,0.66,1.0].forEach((st,i)=>setTimeout(()=>exportCube(st),i*400)); }
+
+// PNG LUT: graded identity laid out as an N×N tiled image (a usable image-LUT).
+function exportPngLut(){
+  const N=parseInt(document.getElementById('lutSize').value);
+  const bake=bakeLUT(N); if(!bake)return;
+  const W=bake.W,H=bake.N; const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d'); const img=x.createImageData(W,H);
+  for(let i=0;i<W*H;i++){ img.data[i*4]=clamp01(bake.data[i*4])*255; img.data[i*4+1]=clamp01(bake.data[i*4+1])*255;
+    img.data[i*4+2]=clamp01(bake.data[i*4+2])*255; img.data[i*4+3]=255; }
+  x.putImageData(img,0,0);
+  c.toBlob(bl=>download(`${safeName(currentLookName())}_${grade.inputTransform}_lut${N}.png`,bl,'image/png'));
+  setStatus(`PNG LUT exported (tiled ${N}× identity image).`);
+}
+
+// .xmp Lightroom preset (approximation of supported sliders + curves).
+function exportXmp(){
+  const g=grade;
+  const tc=(pts)=>{ const f=buildSpline(pts); return [0,0.25,0.5,0.75,1].map(x=>`${Math.round(x*255)}, ${Math.round(clamp01(f(x))*255)}`); };
+  const seq=arr=>arr.map(p=>`<rdf:li>${p}</rdf:li>`).join('');
+  const xmp=`<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+   crs:Version="15.0" crs:Name="${currentLookName()}"
+   crs:Temperature="${Math.round(g.temp*100)}" crs:Tint="${Math.round(g.tint*100)}"
+   crs:Exposure2012="${g.exposure.toFixed(2)}" crs:Contrast2012="${Math.round(g.contrast*100)}"
+   crs:Highlights2012="${Math.round(g.highlights*100)}" crs:Shadows2012="${Math.round(g.shadows*100)}"
+   crs:Whites2012="${Math.round(g.whites*100)}" crs:Blacks2012="${Math.round(g.blacks*100)}"
+   crs:Vibrance="${Math.round(g.vibrance*100)}" crs:Saturation="${Math.round(g.saturation*100)}"
+   crs:SplitToningShadowHue="${Math.round(g.split.shHue)}" crs:SplitToningShadowSaturation="${Math.round(g.split.shAmt*100)}"
+   crs:SplitToningHighlightHue="${Math.round(g.split.hiHue)}" crs:SplitToningHighlightSaturation="${Math.round(g.split.hiAmt*100)}"
+   crs:SplitToningBalance="${Math.round(g.split.balance*100)}"
+   crs:HueAdjustmentRed="${Math.round(g.hsl.hue[0]*100)}" crs:HueAdjustmentOrange="${Math.round(g.hsl.hue[1]*100)}"
+   crs:HueAdjustmentYellow="${Math.round(g.hsl.hue[2]*100)}" crs:HueAdjustmentGreen="${Math.round(g.hsl.hue[3]*100)}"
+   crs:HueAdjustmentAqua="${Math.round(g.hsl.hue[4]*100)}" crs:HueAdjustmentBlue="${Math.round(g.hsl.hue[5]*100)}"
+   crs:HueAdjustmentMagenta="${Math.round(g.hsl.hue[6]*100)}"
+   crs:SaturationAdjustmentRed="${Math.round(g.hsl.sat[0]*100)}" crs:SaturationAdjustmentOrange="${Math.round(g.hsl.sat[1]*100)}"
+   crs:SaturationAdjustmentYellow="${Math.round(g.hsl.sat[2]*100)}" crs:SaturationAdjustmentGreen="${Math.round(g.hsl.sat[3]*100)}"
+   crs:SaturationAdjustmentAqua="${Math.round(g.hsl.sat[4]*100)}" crs:SaturationAdjustmentBlue="${Math.round(g.hsl.sat[5]*100)}"
+   crs:SaturationAdjustmentMagenta="${Math.round(g.hsl.sat[6]*100)}"
+   crs:LuminanceAdjustmentRed="${Math.round(g.hsl.lum[0]*100)}" crs:LuminanceAdjustmentOrange="${Math.round(g.hsl.lum[1]*100)}"
+   crs:LuminanceAdjustmentYellow="${Math.round(g.hsl.lum[2]*100)}" crs:LuminanceAdjustmentGreen="${Math.round(g.hsl.lum[3]*100)}"
+   crs:LuminanceAdjustmentAqua="${Math.round(g.hsl.lum[4]*100)}" crs:LuminanceAdjustmentBlue="${Math.round(g.hsl.lum[5]*100)}"
+   crs:LuminanceAdjustmentMagenta="${Math.round(g.hsl.lum[6]*100)}">
+   <crs:ToneCurvePV2012><rdf:Seq>${seq(tc(g.curves.master))}</rdf:Seq></crs:ToneCurvePV2012>
+   <crs:ToneCurvePV2012Red><rdf:Seq>${seq(tc(g.curves.r))}</rdf:Seq></crs:ToneCurvePV2012Red>
+   <crs:ToneCurvePV2012Green><rdf:Seq>${seq(tc(g.curves.g))}</rdf:Seq></crs:ToneCurvePV2012Green>
+   <crs:ToneCurvePV2012Blue><rdf:Seq>${seq(tc(g.curves.b))}</rdf:Seq></crs:ToneCurvePV2012Blue>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>`;
+  download(`${safeName(currentLookName())}.xmp`,xmp,'application/rdf+xml');
+  setStatus('.xmp exported (approximation — .cube is the exact one).');
+}
+
+// In-app self-test: neutral grade must export an identity LUT.
+function selfTest(){
+  const saved=grade; grade=defaultGrade(); updateCurveTexture();
+  const bake=bakeLUT(17); grade=saved; updateCurveTexture(); render();
+  if(!bake){ return; }
+  let maxErr=0;
+  for(let b=0;b<17;b++)for(let g=0;g<17;g++)for(let r=0;r<17;r++){
+    const [R,G,B]=lutValue(bake,r,g,b);
+    maxErr=Math.max(maxErr,Math.abs(R-r/16),Math.abs(G-g/16),Math.abs(B-b/16));
+  }
+  setStatus(`Identity round-trip max error: ${maxErr.toExponential(2)} ${maxErr<0.004?'✓ PASS':'✗ check'} (Rec.709 neutral).`);
+}
+
+/* ==========================================================================
+   COVER IMAGE + CONTACT SHEET (offscreen renders)
+   ========================================================================== */
+// Render the active source fully graded (no split) to an offscreen 2D canvas.
+function renderGradedToCanvas(){
+  const prevSplit=splitOn, prevZebra=zebraOn; splitOn=false; zebraOn=false;
+  drawPreview(); const c=document.createElement('canvas'); c.width=canvas.width; c.height=canvas.height;
+  c.getContext('2d').drawImage(canvas,0,0); splitOn=prevSplit; zebraOn=prevZebra; drawPreview(); return c;
+}
+function currentSourceCanvas(){
+  const s=sources[activeSource]; const c=document.createElement('canvas');
+  c.width=canvas.width; c.height=canvas.height; const x=c.getContext('2d');
+  x.drawImage(s.el,0,0,c.width,c.height); return c;
+}
+function exportCover(){
+  const graded=renderGradedToCanvas(), orig=currentSourceCanvas();
+  const W=1200, H=Math.round(W*orig.height/orig.width);
+  const c=document.createElement('canvas'); c.width=W; c.height=H+120; const x=c.getContext('2d');
+  x.fillStyle='#1A1A1A'; x.fillRect(0,0,c.width,c.height);
+  x.save(); x.beginPath(); x.rect(0,0,W/2,H); x.clip(); x.drawImage(orig,0,0,W,H); x.restore();
+  x.save(); x.beginPath(); x.rect(W/2,0,W/2,H); x.clip(); x.drawImage(graded,0,0,W,H); x.restore();
+  x.strokeStyle='#FA4616'; x.lineWidth=3; x.beginPath(); x.moveTo(W/2,0); x.lineTo(W/2,H); x.stroke();
+  x.font='600 11px "JetBrains Mono",monospace'; x.fillStyle='rgba(245,243,239,.85)';
+  x.fillText('BEFORE',16,24); x.fillStyle='#FFC72C'; x.fillText('AFTER',W/2+16,24);
+  // footer band
+  x.fillStyle='#242424'; x.fillRect(0,H,W,120);
+  x.fillStyle='#F5F3EF'; x.font='700 34px "Space Grotesk",sans-serif';
+  x.fillText(currentLookName(),24,H+58);
+  x.fillStyle='#9A968F'; x.font='500 16px "JetBrains Mono",monospace';
+  x.fillText('for '+grade.inputTransform.toUpperCase()+'  ·  Rec.709 out',24,H+88);
+  x.fillStyle='#FA4616'; x.font='700 22px "Space Grotesk",sans-serif'; x.textAlign='right';
+  x.fillText('MEAT LUT',W-24,H+58); x.fillStyle='rgba(255,199,44,.5)'; x.font='600 13px "JetBrains Mono",monospace';
+  x.fillText('LUT GEN',W-24,H+84); x.textAlign='left';
+  c.toBlob(bl=>download(`${safeName(currentLookName())}_cover.png`,bl,'image/png'));
+  setStatus('Cover image exported.');
+}
+// QC contact sheet: every look × every image in a grid.
+function exportContactSheet(){
+  if(!looks.length){ setStatus('Save some looks first for a contact sheet.'); return; }
+  const imgs=sources.filter(s=>s.type==='image'); if(!imgs.length){ setStatus('Load at least one image.'); return; }
+  const cellW=240, cellH=150, pad=8, labelH=22;
+  const cols=imgs.length, rows=looks.length;
+  const W=cols*cellW+(cols+1)*pad, H=rows*(cellH+labelH)+(rows+1)*pad+30;
+  const sheet=document.createElement('canvas'); sheet.width=W; sheet.height=H; const sx=sheet.getContext('2d');
+  sx.fillStyle='#1A1A1A'; sx.fillRect(0,0,W,H);
+  sx.fillStyle='#F5F3EF'; sx.font='700 18px "Space Grotesk",sans-serif'; sx.fillText('MEAT LUT — QC contact sheet',pad,22);
+  const saved=clone(grade); const savedSrc=activeSource;
+  looks.forEach((lk,ri)=>{
+    grade=Object.assign(defaultGrade(),clone(lk.grade)); updateCurveTexture();
+    imgs.forEach((src,ci)=>{
+      const realIdx=sources.indexOf(src); switchSource(realIdx,true);
+      const g=renderGradedToCanvas();
+      const dx=pad+ci*(cellW+pad), dy=30+pad+ri*(cellH+labelH+pad);
+      sx.drawImage(g,dx,dy,cellW,cellH);
+      sx.fillStyle='#242424'; sx.fillRect(dx,dy+cellH,cellW,labelH);
+      sx.fillStyle='#FFC72C'; sx.font='600 11px "JetBrains Mono",monospace';
+      sx.fillText(lk.name,dx+6,dy+cellH+15);
+    });
+  });
+  grade=saved; updateCurveTexture(); switchSource(savedSrc,true); render();
+  sheet.toBlob(bl=>download('MEATLUT_contact_sheet.png',bl,'image/png'));
+  setStatus('QC contact sheet exported.');
+}
+
+/* ==========================================================================
+   SCOPES
+   ========================================================================== */
+let scopeFbo,scopeRT; const SCOPE=200;
+function updateScopes(){
+  // render graded (no split/zebra) into a small RGBA8 FBO and read it back
+  const S=SCOPE;
+  if(!scopeFbo){ scopeFbo=gl.createFramebuffer(); scopeRT=gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D,scopeRT);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,S,S,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,scopeFbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,scopeRT,0); }
+  gl.bindFramebuffer(gl.FRAMEBUFFER,scopeFbo); gl.viewport(0,0,S,S);
+  gl.useProgram(program);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex); gl.uniform1i(U('uImage'),0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,curveTex); gl.uniform1i(U('uCurve'),1);
+  setGradeUniforms();
+  gl.uniform1i(U('uShowSplit'),0); gl.uniform1i(U('uZebra'),0); gl.uniform1i(U('uBake'),0);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  const px=new Uint8Array(S*S*4); gl.readPixels(0,0,S,S,gl.RGBA,gl.UNSIGNED_BYTE,px);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  drawHistogram(px,S); drawVectorscope(px,S);
+}
+function drawHistogram(px,S){
+  const cv=document.getElementById('histCanvas'), x=cv.getContext('2d');
+  const W=cv.width,H=cv.height; x.clearRect(0,0,W,H); x.fillStyle='#161616'; x.fillRect(0,0,W,H);
+  const bins=[new Float32Array(256),new Float32Array(256),new Float32Array(256)];
+  for(let i=0;i<S*S;i++){ for(let k=0;k<3;k++) bins[k][px[i*4+k]]++; }
+  let mx=1; bins.forEach(bn=>bn.forEach(v=>mx=Math.max(mx,v)));
+  const cols=['rgba(250,70,22,.8)','rgba(78,211,155,.8)','rgba(41,128,255,.8)'];
+  x.globalCompositeOperation='lighter';
+  for(let k=0;k<3;k++){ x.fillStyle=cols[k]; for(let i=0;i<256;i++){ const h=bins[k][i]/mx*H; x.fillRect(i*W/256,H-h,W/256,h); } }
+  x.globalCompositeOperation='source-over';
+}
+function drawVectorscope(px,S){
+  const cv=document.getElementById('vecCanvas'), x=cv.getContext('2d');
+  const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-6;
+  x.clearRect(0,0,W,H); x.fillStyle='#161616'; x.fillRect(0,0,W,H);
+  x.strokeStyle='#2c2c2c'; x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.stroke();
+  // skin-tone line (~ +123° I-line)
+  const skin=123*Math.PI/180; x.strokeStyle='rgba(255,199,44,.7)'; x.beginPath();
+  x.moveTo(cx,cy); x.lineTo(cx+Math.cos(-skin)*R,cy+Math.sin(-skin)*R); x.stroke();
+  x.fillStyle='rgba(245,243,239,.9)';
+  for(let i=0;i<S*S;i+=2){ const r=px[i*4]/255,g=px[i*4+1]/255,b=px[i*4+2]/255;
+    const u=-0.169*r-0.331*g+0.5*b, v=0.5*r-0.419*g-0.081*b;
+    const xx=cx+u*2*R, yy=cy-v*2*R; x.fillRect(xx,yy,1,1); }
+}
+
+/* ==========================================================================
+   LOOKS / SOURCES / VIDEO / SAVE-LOAD
+   ========================================================================== */
+let currentName='Untitled Look';
+function currentLookName(){ return currentName; }
+function refreshLooks(){
+  const list=document.getElementById('looksList'); if(!list)return; list.innerHTML='';
+  looks.forEach((lk,i)=>{ const it=document.createElement('div'); it.className='look-item';
+    it.innerHTML=`<span class="nm">${lk.name}</span>
+      <button class="btn" data-a="load">Load</button>
+      <button class="btn" data-a="cube">.cube</button>
+      <button class="btn ghost" data-a="del">✕</button>`;
+    it.querySelector('[data-a=load]').onclick=()=>{ currentName=lk.name; applyGradeObj(lk.grade); setStatus('Loaded look: '+lk.name); };
+    it.querySelector('[data-a=cube]').onclick=()=>{ const sv=clone(grade), sn=currentName; grade=Object.assign(defaultGrade(),clone(lk.grade)); currentName=lk.name; updateCurveTexture(); exportCube(1); grade=sv; currentName=sn; updateCurveTexture(); render(); };
+    it.querySelector('[data-a=del]').onclick=()=>{ looks.splice(i,1); refreshLooks(); };
+    list.appendChild(it); });
+}
+function saveCurrentLook(name){ looks.push({name:name||('Look '+(looks.length+1)),grade:clone(grade)}); refreshLooks(); }
+
+function addImageSource(img,name){
+  const t=document.createElement('canvas'); t.width=52;t.height=34; t.getContext('2d').drawImage(img,0,0,52,34);
+  sources.push({type:'image',el:img,name:name||('img'+sources.length),thumb:t.toDataURL()});
+  refreshThumbs(); switchSource(sources.length-1);
+}
+function addVideoSource(video,name){
+  sources.push({type:'video',el:video,name:name||'video',thumb:null});
+  refreshThumbs(); switchSource(sources.length-1);
+}
+function refreshThumbs(){
+  const t=document.getElementById('thumbs'); t.innerHTML='';
+  sources.forEach((s,i)=>{ let el;
+    if(s.type==='image'){ el=document.createElement('img'); el.src=s.thumb; }
+    else { el=document.createElement('div'); el.className='vid'; el.textContent='▣'; }
+    if(i===activeSource) el.classList.add('active');
+    el.title=s.name; el.onclick=()=>switchSource(i); t.appendChild(el); });
+}
+let videoRAF=null;
+function switchSource(i,silent){
+  activeSource=i; const s=sources[i]; if(!s)return;
+  if(videoRAF){ cancelAnimationFrame(videoRAF); videoRAF=null; }
+  const playBtn=document.getElementById('btnPlay');
+  if(s.type==='video'){ playBtn.style.display='inline-block'; uploadSource(s.el); render();
+    // live playback loop
+    const loop=()=>{ if(sources[activeSource]!==s){return;} if(!s.el.paused&&!s.el.ended){ uploadSource(s.el); render(); } videoRAF=requestAnimationFrame(loop); };
+    loop();
+  } else { playBtn.style.display='none'; uploadSource(s.el); render(); }
+  if(!silent) refreshThumbs();
+}
+
+function saveJson(){ const data={name:currentName,grade}; download(safeName(currentName)+'.json',JSON.stringify(data,null,2),'application/json'); }
+function loadJsonFile(file){ const rd=new FileReader(); rd.onload=()=>{ try{ const d=JSON.parse(rd.result);
+  if(d.name)currentName=d.name; applyGradeObj(d.grade||d); setStatus('Grade loaded from JSON.'); }catch(e){ setStatus('Bad JSON.'); } }; rd.readAsText(file); }
+
+/* ==========================================================================
+   WIRE UP EVENTS
+   ========================================================================== */
+function loadImageFile(file,cb){ const img=new Image(); img.onload=()=>cb(img); img.src=URL.createObjectURL(file); }
+function wireActions(){
+  document.getElementById('btnVary').onclick=()=>{ makeVariations(grade).forEach(v=>looks.push(v)); refreshLooks(); setStatus('Variations added to Looks.'); };
+  document.getElementById('btnSaveLook').onclick=()=>{ const n=prompt('Look name:',currentName); if(n){ currentName=n; saveCurrentLook(n); } };
+  document.getElementById('btnBranch').onclick=()=>{ saveCurrentLook(currentName+' (branch)'); setStatus('Branched current grade into Looks.'); };
+  document.getElementById('btnSaveJson').onclick=saveJson;
+  document.getElementById('btnLoadJson').onclick=()=>document.getElementById('fileJson').click();
+  document.getElementById('btnBatchCube').onclick=()=>{ if(!looks.length){setStatus('No looks to export.');return;}
+    const sv=clone(grade), sn=currentName;
+    looks.forEach((lk,i)=>setTimeout(()=>{ grade=Object.assign(defaultGrade(),clone(lk.grade)); currentName=lk.name; updateCurveTexture(); exportCube(1); if(i===looks.length-1){ grade=sv; currentName=sn; updateCurveTexture(); render(); } },i*500));
+    setStatus('Batch exporting pack…'); };
+  document.getElementById('btnContact').onclick=exportContactSheet;
+  document.getElementById('btnCube').onclick=()=>exportCube();
+  document.getElementById('btnPng').onclick=exportPngLut;
+  document.getElementById('btnXmp').onclick=exportXmp;
+  document.getElementById('btnTrio').onclick=exportTrio;
+  document.getElementById('btnCover').onclick=exportCover;
+  document.getElementById('btnSelftest').onclick=selfTest;
+  // reference look-match
+  document.getElementById('btnTarget').onclick=()=>document.getElementById('fileTarget').click();
+  document.getElementById('btnSource').onclick=()=>document.getElementById('fileSource').click();
+  document.getElementById('btnMatch').onclick=runLookMatch;
+  document.getElementById('fileTarget').onchange=e=>{ if(e.target.files[0]) loadImageFile(e.target.files[0],img=>{ refTarget=img; const box=document.getElementById('boxTarget'); box.innerHTML=''; const im=new Image(); im.src=img.src; box.appendChild(im); }); };
+  document.getElementById('fileSource').onchange=e=>{ if(e.target.files[0]) loadImageFile(e.target.files[0],img=>{ refSource=img; const box=document.getElementById('boxSource'); box.innerHTML=''; const im=new Image(); im.src=img.src; box.appendChild(im); }); };
+  document.getElementById('fileJson').onchange=e=>{ if(e.target.files[0]) loadJsonFile(e.target.files[0]); };
+}
+
+/* header buttons */
+document.getElementById('inputTransform').onchange=e=>{ grade.inputTransform=e.target.value; render(); setStatus('Input transfer: '+e.target.value); };
+document.getElementById('btnImg').onclick=()=>document.getElementById('fileImg').click();
+document.getElementById('btnVid').onclick=()=>document.getElementById('fileVid').click();
+document.getElementById('fileImg').onchange=e=>{ [...e.target.files].forEach(f=>loadImageFile(f,img=>addImageSource(img,f.name))); };
+document.getElementById('fileVid').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const v=document.createElement('video');
+  v.src=URL.createObjectURL(f); v.loop=true; v.muted=true; v.playsInline=true; v.onloadeddata=()=>addVideoSource(v,f.name); };
+document.getElementById('btnPlay').onclick=()=>{ const s=sources[activeSource]; if(s&&s.type==='video'){ if(s.el.paused){ s.el.play(); document.getElementById('btnPlay').textContent='❚❚ Pause'; switchSource(activeSource,true);} else { s.el.pause(); document.getElementById('btnPlay').textContent='▶ Play'; } } };
+document.getElementById('btnSplit').onclick=e=>{ splitOn=!splitOn; e.target.textContent='Split: '+(splitOn?'On':'Off'); e.target.classList.toggle('on',splitOn);
+  document.getElementById('splitHandle').style.display=splitOn?'flex':'none';
+  document.getElementById('beforeLabel').style.display=splitOn?'block':'none';
+  document.getElementById('afterLabel').style.display=splitOn?'block':'none'; render(); };
+document.getElementById('btnZebra').onclick=e=>{ zebraOn=!zebraOn; e.target.textContent='Zebras: '+(zebraOn?'On':'Off'); e.target.classList.toggle('on',zebraOn); render(); };
+document.getElementById('btnScopes').onclick=e=>{ scopesOn=!scopesOn; e.target.textContent='Scopes: '+(scopesOn?'On':'Off'); e.target.classList.toggle('on',scopesOn);
+  document.getElementById('scopes').classList.toggle('show',scopesOn); if(scopesOn) updateScopes(); };
+document.getElementById('btnReset').onclick=()=>{ const it=grade.inputTransform; grade=defaultGrade(); grade.inputTransform=it; refreshAllUI(); updateCurveTexture(); render(); setStatus('Grade reset.'); };
+
+/* split slider drag */
+const handle=document.getElementById('splitHandle');
+function positionHandle(){ handle.style.left=(splitPos*100)+'%'; }
+function updateSplitFromX(cx){ const r=canvas.getBoundingClientRect(); splitPos=clamp01((cx-r.left)/r.width); positionHandle(); render(); }
+let dragSplit=false;
+handle.addEventListener('pointerdown',e=>{ dragSplit=true; handle.setPointerCapture(e.pointerId); e.preventDefault(); });
+handle.addEventListener('pointermove',e=>{ if(dragSplit) updateSplitFromX(e.clientX); });
+handle.addEventListener('pointerup',()=>dragSplit=false);
+
+/* drag & drop images onto preview */
+['dragover','drop'].forEach(ev=>document.getElementById('previewPane').addEventListener(ev,e=>{ e.preventDefault();
+  if(ev==='drop'&&e.dataTransfer.files[0]){ const f=e.dataTransfer.files[0];
+    if(f.type.startsWith('video')){ const v=document.createElement('video'); v.src=URL.createObjectURL(f); v.loop=true; v.muted=true; v.playsInline=true; v.onloadeddata=()=>addVideoSource(v,f.name); }
+    else loadImageFile(f,img=>addImageSource(img,f.name)); } }));
+
+/* ==========================================================================
+   INIT
+   ========================================================================== */
 function init(){
   if(!gl) return;
-  buildProgram();
-  buildQuad();
-  buildTexture();
-  buildUI();
-  uploadImage(makeDefaultImage());   // show something immediately
+  buildProgram(); buildQuad(); buildTexture(); buildCurveTexture(); buildUI();
+  addImageSource(makeDefaultImage(),'sample');
   positionHandle();
-  document.getElementById('statusText').textContent = 'WebGL2 ready — Phase 1';
+  document.getElementById('btnSplit').classList.add('on');
+  setStatus('WebGL2 ready — full build. '+(floatOK?'Float export OK.':'⚠ float export unavailable.'));
 }
 init();
 </script>
