@@ -1,40 +1,51 @@
 # LUT GEN — MEAT LUT creation studio
 
-An internal, single-file web tool for crafting color looks and exporting
-professional, sellable LUT files. Vanilla HTML/CSS/JS, WebGL2 for all live
-grading, no backend — drop `index.html` on GitHub Pages and go.
+A single-file web tool for crafting color looks and exporting professional,
+sellable LUT files. Vanilla HTML/CSS/JS, WebGL2 for all live grading, no backend
+— drop `index.html` on GitHub Pages and go.
 
-## Status
+## Status: full build (Phases 1–10) ✅
 
-**Phase 1 — Core grading engine ✅**
+**Grading engine (live WebGL2 fragment shader)**
+- White balance (Temperature, Tint)
+- Tone (Exposure, Contrast, Highlights, Shadows, Whites, Blacks)
+- 3-way color — Lift / Gamma / Gain (color wheel + level each)
+- HSL color mixer (Hue / Sat / Luminance per band)
+- Saturation & Vibrance
+- Split toning (shadow/highlight hue + amount + balance)
+- Faded-black matte floor
+- **Curve editor** — RGB + per-channel R/G/B, draggable points, monotone-cubic
+  interpolation, baked to a 1D LUT (click add · drag · shift-click delete · dbl-click reset)
 
-- MEAT LUT KMUTT theme + layout skeleton, WebGL2 canvas.
-- Live grading in a single WebGL2 fragment shader:
-  - White balance (Temperature, Tint)
-  - Tone (Exposure, Contrast, Highlights, Shadows, Whites, Blacks)
-  - 3-way color — Lift / Gamma / Gain (color wheel + level each)
-  - HSL color mixer (Hue / Sat / Luminance per band: Red, Orange, Yellow,
-    Green, Aqua, Blue, Magenta)
-  - Saturation & Vibrance
-- Before/after split slider with image upload (+ drag & drop).
+**Reference look-match** — upload a target + your source still; computes a
+per-channel mean/std transfer as **editable R/G/B curves** to refine.
 
-The grade math is written so the **exact same shader pipeline** can later be
-re-run on an identity LUT grid to bake an exact `.cube` export (Phase 8). A
-neutral grade is verified to be a numerical identity, so the future round-trip
-is exact.
+**Presets & variations** — parametric film-stock starters (Clean Neutral, Warm
+Portrait Film, Cool Cinematic, Faded Retro, Punchy Teal-Orange) and one-click
+auto variations (warmer/cooler/faded/punchier/more-or-less saturated) → saved looks.
 
-> **Color-science note (Phase 1 default):** grading runs directly on the
-> image's stored 0..1 RGB values (display/encoded space), which is the natural
-> model for a LUT applied to Rec.709 video. Log decode + linear/working-space
-> options arrive in Phase 7.
+**Previews** — before/after split slider, multi-image switching, live video
+(motion) preview.
+
+**Scopes & safety** — RGB histogram, vectorscope with a skin-tone reference line,
+and highlight/shadow clipping zebras.
+
+**Color space / Log** — input transfer Rec.709 / Sony S-Log3 / Panasonic V-Log /
+Canon C-Log. Log is decoded to Rec.709 for grading and the conversion is **baked
+into the exported LUT**; output is Rec.709, labelled with its intended input.
+
+**Export** — exact `.cube` (17/33/65) baked by re-running the exact shader on an
+identity grid; PNG LUT; approximate Lightroom `.xmp`; intensity bake (any % plus a
+subtle/medium/strong trio). Plus an **auto cover image**, **batch pack export**,
+**QC contact sheet**, and save/load grade JSON.
+
+> **Exactness:** `.cube` is exact (preview == export by construction). A neutral
+> grade is verified to round-trip to an identity LUT — there's an in-app
+> "Verify identity" button. `.xmp` is an approximation of the supported sliders.
 
 ## Usage
 
-Open `index.html` in any WebGL2 browser. Click **Load Image** (or drag an image
-onto the preview) and start grading. Drag the divider to compare before/after.
+Open `index.html` in any WebGL2 browser. Load an image (or drag one in), grade,
+and export. For log footage, set the **Input** transfer first.
 
-## Roadmap
-
-Split toning · faded black · curve editor · reference look-match · film-stock
-presets · auto variations · multi-image + motion preview · scopes · log/color
-space · multi-format LUT export · auto cover image · pack workflow.
+> **Note:** use your own images for look-match; don't clone copyrighted frames for resale.
